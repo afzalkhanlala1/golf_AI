@@ -1,0 +1,295 @@
+{
+  "$ref": "#/definitions/AnalysisResult",
+  "definitions": {
+    "AnalysisResult": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "1.0"
+        },
+        "swingId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "OK",
+            "REJECTED"
+          ]
+        },
+        "rejectionReason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "capture": {
+          "type": "object",
+          "properties": {
+            "fps": {
+              "type": "number"
+            },
+            "width": {
+              "type": "number"
+            },
+            "height": {
+              "type": "number"
+            },
+            "frameCount": {
+              "type": "number"
+            },
+            "durationMs": {
+              "type": "number"
+            },
+            "view": {
+              "type": "string",
+              "enum": [
+                "face_on",
+                "down_the_line",
+                "unknown"
+              ]
+            }
+          },
+          "required": [
+            "fps",
+            "width",
+            "height",
+            "frameCount",
+            "durationMs",
+            "view"
+          ],
+          "additionalProperties": false
+        },
+        "quality": {
+          "type": "object",
+          "properties": {
+            "poseConfidenceMean": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "fpsAdequate": {
+              "type": "boolean"
+            },
+            "fullBodyInFrame": {
+              "type": "boolean"
+            },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "low_fps",
+                  "low_light",
+                  "partial_body",
+                  "multiple_people",
+                  "camera_moved",
+                  "view_ambiguous",
+                  "short_clip"
+                ]
+              }
+            }
+          },
+          "required": [
+            "poseConfidenceMean",
+            "fpsAdequate",
+            "fullBodyInFrame",
+            "warnings"
+          ],
+          "additionalProperties": false
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "address",
+                  "toe_up",
+                  "mid_backswing",
+                  "top",
+                  "mid_downswing",
+                  "impact",
+                  "mid_follow_through",
+                  "finish"
+                ]
+              },
+              "frame": {
+                "type": "integer"
+              },
+              "timestampMs": {
+                "type": "number"
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "event",
+              "frame",
+              "timestampMs",
+              "confidence"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "value": {
+                "type": "number"
+              },
+              "unit": {
+                "type": "string",
+                "enum": [
+                  "deg",
+                  "ratio",
+                  "norm",
+                  "ms",
+                  "index"
+                ]
+              },
+              "phase": {
+                "type": "string",
+                "enum": [
+                  "setup",
+                  "backswing",
+                  "top",
+                  "downswing",
+                  "impact",
+                  "finish",
+                  "full"
+                ]
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "target": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "min": {
+                        "type": "number"
+                      },
+                      "max": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "min",
+                      "max"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "key",
+              "value",
+              "unit",
+              "phase",
+              "confidence",
+              "target"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "faults": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "s_posture",
+                  "c_posture",
+                  "loss_of_posture",
+                  "flat_shoulder_plane",
+                  "early_extension",
+                  "over_the_top",
+                  "sway",
+                  "slide",
+                  "reverse_spine_angle",
+                  "hanging_back",
+                  "casting",
+                  "chicken_wing"
+                ]
+              },
+              "severity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "phase": {
+                "type": "string"
+              },
+              "detectedFrom": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "code",
+              "severity",
+              "phase",
+              "detectedFrom",
+              "confidence"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "keypointsUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uri"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "swingId",
+        "status",
+        "rejectionReason",
+        "capture",
+        "quality",
+        "events",
+        "metrics",
+        "faults",
+        "keypointsUrl"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
