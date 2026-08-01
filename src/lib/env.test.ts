@@ -5,7 +5,7 @@ const REQUIRED = {
   BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_test",
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_placeholder",
   CLERK_SECRET_KEY: "sk_test_placeholder",
-  ANTHROPIC_API_KEY: "sk-ant-placeholder",
+  OPENROUTER_API_KEY: "sk-or-v1-placeholder",
   INFERENCE_MODE: "mock",
   INFERENCE_SHARED_SECRET: "test-shared-secret",
   NEXT_PUBLIC_APP_URL: "http://localhost:3000",
@@ -25,7 +25,7 @@ describe("getEnv", () => {
     const { getEnv } = await import("./env");
     const env = getEnv();
     expect(env.INFERENCE_MODE).toBe("mock");
-    expect(env.DATABASE_URL).toContain("postgresql://");
+    expect(env.OPENROUTER_API_KEY).toContain("sk-or");
   });
 
   it("fails fast when required vars are missing", async () => {

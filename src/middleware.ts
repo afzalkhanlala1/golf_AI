@@ -1,16 +1,31 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
+import { isAuthDisabled } from "@/lib/auth-mode";
 
-const isProtectedRoute = createRouteMatcher([
-  "/upload(.*)",
-  "/swings(.*)",
-  "/progress(.*)",
-]);
-
-export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) {
-    await auth.protect();
+export default async function middleware(
+  req: NextRequest,
+  event: NextFetchEvent,
+) {
+  if (isAuthDisabled()) {
+    return NextResponse.next();
   }
-});
+
+  const { clerkMiddleware, createRouteMatcher } = await import(
+    "@clerk/nextjs/server"
+  );
+
+  const isProtectedRoute = createRouteMatcher([
+    "/upload(.*)",
+    "/swings(.*)",
+    "/progress(.*)",
+  ]);
+
+  return clerkMiddleware(async (auth, request) => {
+    if (isProtectedRoute(request)) {
+      await auth.protect();
+    }
+  })(req, event);
+}
 
 export const config = {
   matcher: [

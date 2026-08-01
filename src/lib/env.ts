@@ -2,7 +2,8 @@ import { z } from "zod";
 
 /**
  * Fail-fast environment validation.
- * Loaded by server code that needs secrets; throws a clear error if invalid.
+ * OPENROUTER_API_KEY is used for coaching feedback (Phase B temporary
+ * deviation from Anthropic SDK — same structured JSON contract).
  */
 
 const envSchema = z.object({
@@ -12,7 +13,8 @@ const envSchema = z.object({
     .string()
     .min(1, "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required"),
   CLERK_SECRET_KEY: z.string().min(1, "CLERK_SECRET_KEY is required"),
-  ANTHROPIC_API_KEY: z.string().min(1, "ANTHROPIC_API_KEY is required"),
+  OPENROUTER_API_KEY: z.string().min(1, "OPENROUTER_API_KEY is required"),
+  ANTHROPIC_API_KEY: z.string().optional().or(z.literal("")),
   INFERENCE_MODE: z.enum(["mock", "modal"]),
   INFERENCE_URL: z.string().url().optional().or(z.literal("")),
   INFERENCE_SHARED_SECRET: z
@@ -42,8 +44,9 @@ export function getEnv(): Env {
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
       process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
     CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
-    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
-    INFERENCE_MODE: process.env.INFERENCE_MODE,
+    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? "",
+    INFERENCE_MODE: process.env.INFERENCE_MODE ?? "mock",
     INFERENCE_URL: process.env.INFERENCE_URL ?? "",
     INFERENCE_SHARED_SECRET: process.env.INFERENCE_SHARED_SECRET,
     SWINGNET_CHECKPOINT_URL: process.env.SWINGNET_CHECKPOINT_URL ?? "",
@@ -67,7 +70,6 @@ export function getEnv(): Env {
   return cached;
 }
 
-/** Subset needed for DB-only checks (e.g. /api/health). */
 export function getDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {

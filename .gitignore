@@ -60,3 +60,5 @@ next-env.d.ts
 Golf-AI-Build-Plan.pdf
 SPEC.md.txt
 
+.vercel
+.env*

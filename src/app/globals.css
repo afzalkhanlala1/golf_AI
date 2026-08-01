@@ -49,14 +49,23 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --fairway: #0f3d2e;
+  --fairway-soft: #2f6b52;
+  --sand: #a67c52;
+  --sand-soft: #f0e2cf;
+  --fog: #f3f6f2;
+  --mist: #e4ede6;
+  --ink: #14201a;
+  --ink-muted: #5b6b61;
+  --line: #cfd9d1;
+  --background: var(--fog);
+  --foreground: var(--ink);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: var(--fairway);
+  --primary-foreground: #f7fbf8;
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -123,6 +132,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans-body), ui-sans-serif, system-ui, sans-serif;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 10% -10%, #d8e8dc 0%, transparent 55%),
+      radial-gradient(ellipse 60% 40% at 100% 0%, #efe4d4 0%, transparent 45%),
+      linear-gradient(180deg, #f7faf6 0%, var(--fog) 40%, #eef3ef 100%);
+    background-attachment: fixed;
   }
   html {
     @apply font-sans;
