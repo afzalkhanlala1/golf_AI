@@ -243,13 +243,16 @@ export function SwingResult({ id }: { id: string }) {
                         .map((m) => (
                           <li key={`${phase}-${m.key}`} className="flex justify-between gap-3">
                             <span>{m.key}</span>
-                            <span className="tabular-nums">
+                            <span className="tabular-nums text-right">
                               {m.value}
                               {m.unit === "deg" ? "°" : m.unit === "ms" ? "ms" : ""}
                               {m.targetMin != null && m.targetMax != null
                                 ? ` (target ${m.targetMin}–${m.targetMax})`
                                 : ""}
                               {m.confidence < 0.5 ? " · low conf" : ""}
+                              {m.key === "kinematic_sequence_index"
+                                ? " · directional proxy"
+                                : ""}
                             </span>
                           </li>
                         ))}

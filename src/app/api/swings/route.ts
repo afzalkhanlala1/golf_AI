@@ -12,15 +12,22 @@ import {
   markProcessing,
   persistAnalysisResult,
 } from "@/lib/swings/process";
+import { DEMO_SWINGS, DEMO_VIDEO_URL } from "@/lib/demos";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const CreateSwingSchema = z.object({
-  blobUrl: z.string().url(),
-  view: z.enum(["face_on", "down_the_line", "unknown"]).default("unknown"),
-  club: z.string().max(40).optional().nullable(),
-});
+const CreateSwingSchema = z.union([
+  z.object({
+    blobUrl: z.string().url(),
+    view: z.enum(["face_on", "down_the_line", "unknown"]).default("unknown"),
+    club: z.string().max(40).optional().nullable(),
+  }),
+  z.object({
+    demo: z.enum(["good", "early_extension", "low_fps"]),
+    view: z.enum(["face_on", "down_the_line", "unknown"]).default("face_on"),
+  }),
+]);
 
 export async function GET() {
   const { userId } = await auth();
@@ -53,13 +60,23 @@ export async function POST(request: Request) {
   const body = CreateSwingSchema.parse(await request.json());
   const db = getDb();
 
+  const demo =
+    "demo" in body
+      ? DEMO_SWINGS.find((d) => d.id === body.demo)
+      : undefined;
+
+  const blobUrl = "blobUrl" in body ? body.blobUrl : DEMO_VIDEO_URL;
+  const club =
+    "club" in body ? (body.club ?? null) : (demo?.club ?? null);
+  const view = body.view;
+
   const [swing] = await db
     .insert(swings)
     .values({
       userId,
-      blobUrl: body.blobUrl,
-      view: body.view,
-      club: body.club ?? null,
+      blobUrl,
+      view,
+      club,
       status: "QUEUED",
     })
     .returning();
@@ -73,9 +90,9 @@ export async function POST(request: Request) {
       await markProcessing(swing.id);
       const result = await runInference({
         swingId: swing.id,
-        blobUrl: body.blobUrl,
-        view: body.view,
-        club: body.club,
+        blobUrl,
+        view,
+        club,
       });
       await persistAnalysisResult(result);
     } catch (error) {

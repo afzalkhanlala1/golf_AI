@@ -19,16 +19,22 @@ const findings: FindingsPayload = {
       unit: "norm",
       target: { min: 0, max: 0.05 },
     },
+    {
+      key: "tempo_ratio",
+      value: 2.4,
+      unit: "ratio",
+      target: { min: 2.7, max: 3.3 },
+    },
   ],
-  phaseScores: { downswing: 58, top: 72 },
+  phaseScores: { downswing: 58, top: 72, setup: 80 },
   overall: 64,
   qualityWarnings: [],
 };
 
 describe("validateGrounding", () => {
-  it("accepts grounded numbers", () => {
+  it("accepts grounded numbers including targets and scores", () => {
     const text =
-      "Your overall is 64. Early extension severity 0.62 showed hips moving 0.18.";
+      "Overall 64. Downswing 58. Hip depth 0.18 vs target 0.05. Tempo 2.4 (want 2.7–3.3). Do 8 reps.";
     expect(validateGrounding(text, findings)).toEqual([]);
   });
 
@@ -38,9 +44,42 @@ describe("validateGrounding", () => {
     expect(v.some((x) => x.includes("Ungrounded number: 47"))).toBe(true);
   });
 
-  it("rejects banned terminology", () => {
-    const text = "This looks like an injury risk with bad clubhead speed.";
-    const v = validateGrounding(text, findings);
-    expect(v.some((x) => x.includes("Banned term"))).toBe(true);
+  it("rejects banned clubhead / ball flight terms", () => {
+    const cases = [
+      "Your clubhead speed looks great",
+      "ball speed is up",
+      "spin rate improved",
+      "launch angle is perfect",
+      "smash factor of dreams",
+      "carry distance exploded",
+    ];
+    for (const text of cases) {
+      expect(validateGrounding(text, findings).some((x) => x.includes("Banned term"))).toBe(
+        true,
+      );
+    }
+  });
+
+  it("rejects wrist / force-plate / medical claims", () => {
+    const cases = [
+      "Check your wrist flexion",
+      "radial deviation issue",
+      "ground reaction force is off",
+      "force plate would confirm",
+      "weight distribution problem",
+      "this may cause injury",
+      "see a physiotherapy clinic",
+      "herniated disc risk",
+      "my diagnosis is early extension",
+    ];
+    for (const text of cases) {
+      expect(
+        validateGrounding(text, findings).some((x) => x.includes("Banned term")),
+      ).toBe(true);
+    }
+  });
+
+  it("allows rep counts 1–20 without findings membership", () => {
+    expect(validateGrounding("Do 12 slow swings.", findings)).toEqual([]);
   });
 });

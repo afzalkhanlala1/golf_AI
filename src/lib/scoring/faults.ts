@@ -126,16 +126,8 @@ const DETECTORS: Array<{
   { code: "hanging_back", fn: detectHangingBack },
 ];
 
-/** Rank and keep top 3 with severity > 0.25 and confidence > 0.5. */
+/** Derive faults from metrics only. Rank top 3 with severity > 0.25 and confidence > 0.5. */
 export function detectFaults(result: AnalysisResult): Fault[] {
-  // Prefer inference-provided faults when present (mock / real service)
-  if (result.faults.length > 0) {
-    return [...result.faults]
-      .filter((f) => f.severity > 0.25 && f.confidence > 0.5)
-      .sort((a, b) => b.severity - a.severity)
-      .slice(0, 3);
-  }
-
   const map = toMetricMap(result);
   const hits: Fault[] = [];
   for (const { code, fn } of DETECTORS) {
