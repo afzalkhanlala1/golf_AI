@@ -4,7 +4,7 @@ import { UserMenu } from "@/components/user-menu";
 const links = [
   { href: "/upload", label: "Upload" },
   { href: "/swings", label: "Swings" },
-  { href: "/progress", label: "Progress" },
+  { href: "/progress", label: "Dashboard" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
