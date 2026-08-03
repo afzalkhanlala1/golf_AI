@@ -1,7 +1,7 @@
 import type { AnalysisResult } from "../../../contract/analysis.schema";
 import { METRIC_TARGETS } from "@/lib/scoring/rubric.config";
 
-export type MockVariant = "good" | "early_extension" | "low_fps";
+export type MockVariant = "good" | "early_extension" | "reduced_fps" | "low_fps";
 
 function metric(
   key: string,
@@ -30,7 +30,7 @@ function metric(
   };
 }
 
-function events(fps: number): AnalysisResult["events"] {
+function events(fps: number, reducedFps = false): AnalysisResult["events"] {
   const frames = {
     address: 24,
     toe_up: 90,
@@ -42,12 +42,18 @@ function events(fps: number): AnalysisResult["events"] {
     finish: 480,
   };
   return (Object.entries(frames) as [AnalysisResult["events"][number]["event"], number][]).map(
-    ([event, frame]) => ({
-      event,
-      frame,
-      timestampMs: (frame / fps) * 1000,
-      confidence: event === "impact" ? 0.94 : 0.86,
-    }),
+    ([event, frame]) => {
+      const base = event === "impact" ? 0.94 : 0.86;
+      // Mirrors inference/pipeline/analyze.py::_fps_confidence_scale — impact
+      // is under-sampled below 120fps, other phases barely move.
+      const scale = !reducedFps ? 1 : event === "impact" ? 0.5 : 0.85;
+      return {
+        event,
+        frame,
+        timestampMs: (frame / fps) * 1000,
+        confidence: Math.round(base * scale * 100) / 100,
+      };
+    },
   );
 }
 
@@ -61,12 +67,12 @@ export function buildMockAnalysis(
       swingId,
       status: "REJECTED",
       rejectionReason:
-        "Clip appears to be ~30fps. Film with your phone's native slow-motion mode (120fps or higher) and upload that file.",
+        "Clip appears to be ~15fps, which is too low to track a golf swing at all. Re-film at 30fps or higher — your phone's native slow-motion mode (120fps+) gives the most accurate result, especially around impact.",
       capture: {
-        fps: 30,
+        fps: 15,
         width: 1080,
         height: 1920,
-        frameCount: 90,
+        frameCount: 45,
         durationMs: 3000,
         view: "face_on",
       },
@@ -83,7 +89,8 @@ export function buildMockAnalysis(
     };
   }
 
-  const fps = 240;
+  const reducedFps = variant === "reduced_fps";
+  const fps = reducedFps ? 30 : 240;
   const good = variant === "good";
 
   const metrics = [
@@ -104,7 +111,17 @@ export function buildMockAnalysis(
     metric("kinematic_sequence_index", good ? 0.92 : 0.55),
     metric("shoulder_plane_top", good ? 45 : 38),
     metric("weight_forward_finish", good ? 0.72 : 0.58),
-  ];
+  ].map((m) =>
+    reducedFps
+      ? {
+          ...m,
+          confidence:
+            Math.round(
+              m.confidence * (m.phase === "impact" || m.phase === "downswing" ? 0.5 : 0.85) * 100,
+            ) / 100,
+        }
+      : m,
+  );
 
   const faults: AnalysisResult["faults"] = good
     ? []
@@ -139,12 +156,12 @@ export function buildMockAnalysis(
       view: "face_on",
     },
     quality: {
-      poseConfidenceMean: good ? 0.93 : 0.87,
-      fpsAdequate: true,
+      poseConfidenceMean: reducedFps ? 0.68 : good ? 0.93 : 0.87,
+      fpsAdequate: !reducedFps,
       fullBodyInFrame: true,
-      warnings: [],
+      warnings: reducedFps ? ["low_fps"] : [],
     },
-    events: events(fps),
+    events: events(fps, reducedFps),
     metrics,
     faults,
     // Keypoints stay on blob in real inference; mock returns null (UI still works).
@@ -154,6 +171,7 @@ export function buildMockAnalysis(
 
 export function pickMockVariant(club?: string | null): MockVariant {
   if (club === "reject-demo") return "low_fps";
+  if (club === "30fps-demo") return "reduced_fps";
   if (club === "good-demo") return "good";
   return "early_extension";
 }

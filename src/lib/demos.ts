@@ -16,10 +16,16 @@ export const DEMO_SWINGS = [
     description: "Hips thrust toward the ball — primary fault + posture loss.",
   },
   {
+    id: "reduced_fps",
+    club: "30fps-demo",
+    title: "30fps (accepted)",
+    description: "Simulates a 30fps upload — analyzed, but impact-phase confidence is reduced.",
+  },
+  {
     id: "low_fps",
     club: "reject-demo",
     title: "Low FPS reject",
-    description: "Simulates a 30fps clip that gets rejected with refilm advice.",
+    description: "Simulates a 15fps clip that's too low to track at all and gets rejected.",
   },
 ] as const;
 

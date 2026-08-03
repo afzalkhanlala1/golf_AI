@@ -14,6 +14,10 @@ export default async function middleware(
     "@clerk/nextjs/server"
   );
 
+  const isPublicApi = createRouteMatcher([
+    "/api/health(.*)",
+    "/api/swings/(.*)/callback",
+  ]);
   const isProtectedRoute = createRouteMatcher([
     "/upload(.*)",
     "/swings(.*)",
@@ -21,6 +25,10 @@ export default async function middleware(
   ]);
 
   return clerkMiddleware(async (auth, request) => {
+    // HMAC-signed Modal callbacks must not require a Clerk session
+    if (isPublicApi(request)) {
+      return;
+    }
     if (isProtectedRoute(request)) {
       await auth.protect();
     }
@@ -29,7 +37,7 @@ export default async function middleware(
 
 export const config = {
   matcher: [
-    "/((?!_next|api/health|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    "/api/((?!health).*)",
+    "/((?!_next|api/health|api/swings/.*/callback|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/api/((?!health|swings/.*/callback).*)",
   ],
 };

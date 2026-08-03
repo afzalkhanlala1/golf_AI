@@ -44,6 +44,12 @@ next-env.d.ts
 # GolfDB / evaluation data — never commit datasets
 /data/
 
+# Inference local venv / caches
+/inference/.venv/
+/inference/__pycache__/
+/inference/**/__pycache__/
+*.pyc
+
 # Playwright
 /test-results/
 /playwright-report/

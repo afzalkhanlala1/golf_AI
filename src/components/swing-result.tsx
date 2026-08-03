@@ -127,7 +127,8 @@ export function SwingResult({ id }: { id: string }) {
           Reading your swing…
         </h1>
         <p className="max-w-lg text-[color:var(--ink-muted)]">
-          Mock inference runs about six seconds, then we score, detect faults, and write coaching notes.
+          Running pose + event detection on GPU — usually 1–3 minutes for a
+          slow-mo clip, then we score, detect faults, and write coaching notes.
         </p>
         <div className="h-2 overflow-hidden rounded-full bg-[color:var(--mist)]">
           <div className="h-full w-1/3 animate-pulse bg-[color:var(--fairway)]" />

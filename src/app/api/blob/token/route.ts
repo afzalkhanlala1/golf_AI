@@ -45,6 +45,7 @@ export async function POST(request: Request) {
     return NextResponse.json(json);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Upload error";
+    console.error("[blob/token]", message);
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

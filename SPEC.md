@@ -34,6 +34,7 @@ These are the constraints that determine the architecture. Violating any of them
 | **Vercel serverless request body limit is 4.5 MB** | Video must be uploaded **client-side directly to blob storage**. It must never pass through a Next.js API route. |
 | **Vercel function max duration is 60s (Hobby) / 300s (Pro)** | Analysis must be **asynchronous**. Submit → poll/stream → render. Never block a request on inference. |
 | **Browsers cannot capture high-framerate video** | iOS Safari caps `getUserMedia` at ~30fps and exposes no API to the phone's 120/240fps slow-motion mode. Android needs the native Camera2 high-speed API. At 30fps a 100mph clubhead moves several feet between frames. **v1 is upload-only.** Do not build an in-browser recorder. |
+| **30fps is the accepted floor, 120fps is the target** | Clips below 24fps are rejected outright (unusable). Clips from 24–120fps are analyzed but flagged `low_fps`, with confidence damped sharply on impact/downswing metrics and the `fpsAdequate` flag set false — never silently presented as full-confidence. |
 | **A single camera cannot measure certain things** | See §7.3. Never emit wrist flexion, ground reaction force, weight distribution, clubhead speed, ball speed, spin, or carry distance. |
 
 ---
@@ -293,7 +294,7 @@ Only surface faults with `severity > 0.25` and `confidence > 0.5`. **Rank them a
 
 ### 7.1 Pipeline
 
-1. **Decode** — `ffprobe` for true fps (container metadata lies). Reject clips under 1s or over 20s. Downsample to max 1080p long edge.
+1. **Decode** — `ffprobe` for true fps (container metadata lies). Reject clips under 1s or over 20s. Downsample to max 1080p long edge. Reject clips under 24fps outright; clips from 24–120fps are accepted with a `low_fps` warning and damped confidence (see §7.2).
 2. **Pose** — RTMPose (via `rtmlib`, ONNX runtime, Apache-2.0) top-down with an RTMDet person detector. Track the largest persistent person; flag `multiple_people` if others are present. Emit 17 COCO keypoints + confidence per frame.
 3. **Events** — two strategies, in order:
    - If `SWINGNET_CHECKPOINT_URL` is set, load the SwingNet checkpoint and run it. Preprocess exactly as GolfDB's repo does (160×160, its normalization).

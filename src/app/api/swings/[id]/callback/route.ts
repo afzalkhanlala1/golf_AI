@@ -23,32 +23,39 @@ function verifySignature(rawBody: string, signature: string | null): boolean {
 
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;
-  const rawBody = await request.text();
-  const signature = request.headers.get("x-signature");
-
-  if (!verifySignature(rawBody, signature)) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-  }
-
-  let payload: unknown;
   try {
-    payload = JSON.parse(rawBody);
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+    const rawBody = await request.text();
+    const signature = request.headers.get("x-signature");
 
-  const parsed = AnalysisResult.safeParse(payload);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Invalid AnalysisResult", details: parsed.error.flatten() },
-      { status: 400 },
-    );
-  }
+    if (!verifySignature(rawBody, signature)) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
 
-  if (parsed.data.swingId !== id) {
-    return NextResponse.json({ error: "swingId mismatch" }, { status: 400 });
-  }
+    let payload: unknown;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
 
-  const result = await persistAnalysisResult(parsed.data);
-  return NextResponse.json(result);
+    const parsed = AnalysisResult.safeParse(payload);
+    if (!parsed.success) {
+      console.error("[callback] schema", parsed.error.flatten());
+      return NextResponse.json(
+        { error: "Invalid AnalysisResult", details: parsed.error.flatten() },
+        { status: 400 },
+      );
+    }
+
+    if (parsed.data.swingId !== id) {
+      return NextResponse.json({ error: "swingId mismatch" }, { status: 400 });
+    }
+
+    const result = await persistAnalysisResult(parsed.data);
+    return NextResponse.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Callback failed";
+    console.error("[callback]", id, message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

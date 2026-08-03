@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 import { upload } from "@vercel/blob/client";
 import { Button } from "@/components/ui/button";
 import { DEMO_SWINGS, type DemoId } from "@/lib/demos";
@@ -10,6 +11,7 @@ type View = "face_on" | "down_the_line";
 
 export function UploadForm() {
   const router = useRouter();
+  const { userId } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<View>("face_on");
   const [club, setClub] = useState("7i");
@@ -105,7 +107,11 @@ export function UploadForm() {
     setError(null);
     startTransition(async () => {
       try {
-        const pathname = `swings/${crypto.randomUUID()}/${file.name.replace(/[^\w.-]+/g, "_")}`;
+        if (!userId) {
+          throw new Error("Sign in to upload a swing.");
+        }
+        // Must match /api/blob/token path guard: swings/<clerkUserId>/...
+        const pathname = `swings/${userId}/${crypto.randomUUID()}/${file.name.replace(/[^\w.-]+/g, "_")}`;
         const blob = await upload(pathname, file, {
           access: "public",
           handleUploadUrl: "/api/blob/token",
@@ -203,7 +209,7 @@ export function UploadForm() {
         <ul className="space-y-2 text-sm text-[color:var(--ink-muted)]">
           <li>Full body in frame from address through finish</li>
           <li>Phone locked on a tripod or lean — camera steady</li>
-          <li>Native slow-motion at 120fps or higher (not the in-browser camera)</li>
+          <li>Native slow-motion at 120fps+ for the most accurate impact read — 30fps minimum accepted</li>
           <li>Clip length about 5–10 seconds, one swing</li>
         </ul>
       </section>
@@ -244,9 +250,14 @@ export function UploadForm() {
           </span>
         </button>
 
-        {fpsEstimate !== null && fpsEstimate < 120 && (
+        {fpsEstimate !== null && fpsEstimate < 24 && (
+          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-900">
+            This file looks like ~{fpsEstimate}fps — too low to track a swing at all. Re-film at 30fps or higher.
+          </p>
+        )}
+        {fpsEstimate !== null && fpsEstimate >= 24 && fpsEstimate < 120 && (
           <p className="rounded-lg bg-[color:var(--sand-soft)] px-3 py-2 text-sm text-[color:var(--ink)]">
-            This file looks like ~{fpsEstimate}fps. You can still upload, but analysis quality will drop — prefer native 120/240fps slow-mo.
+            This file looks like ~{fpsEstimate}fps. It will be analyzed, but confidence around impact will be reduced — prefer native 120/240fps slow-mo when you can.
           </p>
         )}
         {fpsEstimate !== null && fpsEstimate >= 120 && (

@@ -6,13 +6,14 @@ import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { swings } from "@/lib/db/schema";
 import { ensureUser } from "@/lib/auth/ensure-user";
-import { runInference } from "@/lib/inference/client";
+import { startInference } from "@/lib/inference/client";
 import {
   markFailed,
   markProcessing,
   persistAnalysisResult,
 } from "@/lib/swings/process";
 import { DEMO_SWINGS, DEMO_VIDEO_URL } from "@/lib/demos";
+import { getEnv } from "@/lib/env";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -24,7 +25,7 @@ const CreateSwingSchema = z.union([
     club: z.string().max(40).optional().nullable(),
   }),
   z.object({
-    demo: z.enum(["good", "early_extension", "low_fps"]),
+    demo: z.enum(["good", "early_extension", "reduced_fps", "low_fps"]),
     view: z.enum(["face_on", "down_the_line", "unknown"]).default("face_on"),
   }),
 ]);
@@ -88,13 +89,18 @@ export async function POST(request: Request) {
   after(async () => {
     try {
       await markProcessing(swing.id);
-      const result = await runInference({
+      const env = getEnv();
+      const kickoff = await startInference({
         swingId: swing.id,
         blobUrl,
         view,
         club,
+        callbackUrl: `${env.NEXT_PUBLIC_APP_URL}/api/swings/${swing.id}/callback`,
       });
-      await persistAnalysisResult(result);
+      if (kickoff.mode === "sync") {
+        await persistAnalysisResult(kickoff.result);
+      }
+      // modal/async: GPU service posts HMAC-signed callback when done
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Analysis failed";

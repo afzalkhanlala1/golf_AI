@@ -51,3 +51,24 @@ export async function GET(_request: Request, { params }: Params) {
     feedback: fb[0] ?? null,
   });
 }
+
+export async function DELETE(_request: Request, { params }: Params) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const db = getDb();
+
+  const [deleted] = await db
+    .delete(swings)
+    .where(and(eq(swings.id, id), eq(swings.userId, userId)))
+    .returning({ id: swings.id });
+
+  if (!deleted) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ ok: true });
+}

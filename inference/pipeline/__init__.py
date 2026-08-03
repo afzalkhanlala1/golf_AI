@@ -1,0 +1,1 @@
+"""Golf AI inference pipeline."""
