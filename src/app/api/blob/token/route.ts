@@ -1,17 +1,17 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
-import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { getAuthUserEmail, getAuthUserId } from "@/lib/auth/current-user";
 import { getEnv } from "@/lib/env";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  const userId = await getAuthUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const user = await currentUser();
+  const email = await getAuthUserEmail(userId);
   const body = (await request.json()) as HandleUploadBody;
   getEnv(); // fail fast if blob token missing
 
@@ -31,10 +31,7 @@ export async function POST(request: Request) {
             "video/x-m4v",
           ],
           maximumSizeInBytes: 250 * 1024 * 1024,
-          tokenPayload: JSON.stringify({
-            userId,
-            email: user?.emailAddresses[0]?.emailAddress ?? "",
-          }),
+          tokenPayload: JSON.stringify({ userId, email }),
         };
       },
       onUploadCompleted: async () => {

@@ -1,7 +1,7 @@
 import { gunzipSync } from "node:zlib";
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { and, eq } from "drizzle-orm";
+import { getAuthUserId } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/db";
 import { swings } from "@/lib/db/schema";
 
@@ -18,7 +18,7 @@ type Params = { params: Promise<{ id: string }> };
  * URL directly) keeps the ownership check on the server.
  */
 export async function GET(_request: Request, { params }: Params) {
-  const { userId } = await auth();
+  const userId = await getAuthUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

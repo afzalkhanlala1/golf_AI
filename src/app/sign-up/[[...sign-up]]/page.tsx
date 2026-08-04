@@ -1,7 +1,12 @@
 import { SignUp } from "@clerk/nextjs";
+import { redirect } from "next/navigation";
 import { AuthShell, clerkAppearance } from "@/components/auth-shell";
+import { isAuthDisabled } from "@/lib/auth-mode";
 
 export default function SignUpPage() {
+  // No ClerkProvider is mounted under the dev bypass, so <SignUp> would throw.
+  if (isAuthDisabled()) redirect("/upload");
+
   return (
     <AuthShell
       eyebrow="Get started"

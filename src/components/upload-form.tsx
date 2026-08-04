@@ -2,16 +2,19 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
 import { upload } from "@vercel/blob/client";
 import { Button } from "@/components/ui/button";
 import { DEMO_SWINGS, type DemoId } from "@/lib/demos";
 
 type View = "face_on" | "down_the_line";
 
-export function UploadForm() {
+/**
+ * `userId` arrives as a prop from the server page rather than from Clerk's
+ * useAuth(): under the development auth bypass there is no ClerkProvider
+ * mounted, so the hook would throw.
+ */
+export function UploadForm({ userId }: { userId: string }) {
   const router = useRouter();
-  const { userId } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<View>("face_on");
   const [club, setClub] = useState("7i");
@@ -107,10 +110,7 @@ export function UploadForm() {
     setError(null);
     startTransition(async () => {
       try {
-        if (!userId) {
-          throw new Error("Sign in to upload a swing.");
-        }
-        // Must match /api/blob/token path guard: swings/<clerkUserId>/...
+        // Must match /api/blob/token path guard: swings/<userId>/...
         const pathname = `swings/${userId}/${crypto.randomUUID()}/${file.name.replace(/[^\w.-]+/g, "_")}`;
         const blob = await upload(pathname, file, {
           access: "public",

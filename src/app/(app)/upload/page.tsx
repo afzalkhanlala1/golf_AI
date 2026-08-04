@@ -1,6 +1,11 @@
+import { redirect } from "next/navigation";
 import { UploadForm } from "@/components/upload-form";
+import { requireUser } from "@/lib/auth/current-user";
 
-export default function UploadPage() {
+export default async function UploadPage() {
+  const userId = await requireUser();
+  if (!userId) redirect("/sign-in");
+
   return (
     <main className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
       <p className="text-sm uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">
@@ -13,7 +18,7 @@ export default function UploadPage() {
         Use your phone&apos;s native slow-motion camera, then send the file here. We never record inside the browser.
       </p>
       <div className="mt-10">
-        <UploadForm />
+        <UploadForm userId={userId} />
       </div>
     </main>
   );

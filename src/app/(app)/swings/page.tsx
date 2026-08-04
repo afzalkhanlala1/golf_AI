@@ -1,12 +1,12 @@
-import { auth } from "@clerk/nextjs/server";
 import { desc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
+import { requireUser } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/db";
 import { swings } from "@/lib/db/schema";
 import { SwingsList } from "@/components/swings-list";
 
 export default async function SwingsPage() {
-  const { userId } = await auth();
+  const userId = await requireUser();
   if (!userId) redirect("/sign-in");
 
   const db = getDb();

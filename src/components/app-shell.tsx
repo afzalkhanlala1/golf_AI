@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { UserMenu } from "@/components/user-menu";
+import { isAuthDisabled } from "@/lib/auth-mode";
 
 const links = [
   { href: "/upload", label: "Upload" },
@@ -26,7 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {l.label}
               </Link>
             ))}
-            <UserMenu />
+            <UserMenu authDisabled={isAuthDisabled()} />
           </nav>
         </div>
       </header>

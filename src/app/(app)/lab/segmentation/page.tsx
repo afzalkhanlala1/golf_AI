@@ -1,7 +1,7 @@
-import { auth } from "@clerk/nextjs/server";
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { SegmentationLab } from "@/components/segmentation-lab";
+import { requireUser } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/db";
 import { swings } from "@/lib/db/schema";
 
@@ -10,7 +10,7 @@ export const metadata = {
 };
 
 export default async function SegmentationLabPage() {
-  const { userId } = await auth();
+  const userId = await requireUser();
   if (!userId) redirect("/sign-in");
 
   const db = getDb();

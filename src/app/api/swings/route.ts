@@ -1,11 +1,11 @@
 import { after } from "next/server";
 import { NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { swings } from "@/lib/db/schema";
 import { ensureUser } from "@/lib/auth/ensure-user";
+import { getAuthUserEmail, getAuthUserId } from "@/lib/auth/current-user";
 import { startInference } from "@/lib/inference/client";
 import {
   markFailed,
@@ -31,7 +31,7 @@ const CreateSwingSchema = z.union([
 ]);
 
 export async function GET() {
-  const { userId } = await auth();
+  const userId = await getAuthUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -48,14 +48,12 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  const userId = await getAuthUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const user = await currentUser();
-  const email =
-    user?.emailAddresses[0]?.emailAddress ?? `${userId}@users.clerk.local`;
+  const email = await getAuthUserEmail(userId);
   await ensureUser(userId, email);
 
   const body = CreateSwingSchema.parse(await request.json());

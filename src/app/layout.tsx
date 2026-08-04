@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Fraunces, Source_Sans_3 } from "next/font/google";
+import { isAuthDisabled } from "@/lib/auth-mode";
 import "./globals.css";
 
 const display = Fraunces({
@@ -23,13 +24,17 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return (
-    <ClerkProvider>
-      <html lang="en">
-        <body className={`${display.variable} ${sans.variable} antialiased`}>
-          {children}
-        </body>
-      </html>
-    </ClerkProvider>
+  const shell = (
+    <html lang="en">
+      <body className={`${display.variable} ${sans.variable} antialiased`}>
+        {children}
+      </body>
+    </html>
   );
+
+  // With the dev bypass on, mounting ClerkProvider would still try to reach
+  // Clerk (and can redirect-loop on stale cookies), so skip it entirely.
+  if (isAuthDisabled()) return shell;
+
+  return <ClerkProvider>{shell}</ClerkProvider>;
 }

@@ -1,12 +1,12 @@
-import { auth } from "@clerk/nextjs/server";
 import { desc, asc, eq, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { Dashboard } from "@/components/progress-charts";
+import { requireUser } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/db";
 import { swingFaults, swingScores, swings } from "@/lib/db/schema";
 
 export default async function ProgressPage() {
-  const { userId } = await auth();
+  const userId = await requireUser();
   if (!userId) redirect("/sign-in");
 
   const db = getDb();
