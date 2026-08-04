@@ -12,6 +12,10 @@ import {
 } from "@/lib/segmentation/body-parts";
 import { Button } from "@/components/ui/button";
 import { buildDemoSequence } from "@/lib/segmentation/demo-sequence";
+import {
+  extractPoseFromVideo,
+  preloadPoseModel,
+} from "@/lib/segmentation/browser-pose";
 
 type SwingOption = {
   id: string;
@@ -27,6 +31,8 @@ type KeypointPayload = {
   frames: number[][][];
 };
 
+type Mode = "upload" | "swing" | "demo";
+
 const GROUPS: BodyPartGroup[] = ["head", "torso", "arms", "legs"];
 const GROUP_LABEL: Record<BodyPartGroup, string> = {
   head: "Head",
@@ -41,7 +47,6 @@ function toPoseFrames(payload: KeypointPayload): PoseFrame[] {
   );
 }
 
-/** Fill + outline colour for a group, at a given alpha. */
 function rgba(hex: string, alpha: number): string {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
@@ -51,10 +56,9 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number | undefined>(undefined);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [mode, setMode] = useState<"demo" | "swing">(
-    swings.length > 0 ? "swing" : "demo",
-  );
+  const [mode, setMode] = useState<Mode>("upload");
   const [selectedId, setSelectedId] = useState<string>(swings[0]?.id ?? "");
   const [frames, setFrames] = useState<PoseFrame[] | null>(null);
   const [meta, setMeta] = useState<{ fps: number; width: number; height: number } | null>(
@@ -63,6 +67,13 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
   const [frameIndex, setFrameIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Upload-mode state
+  const [uploadUrl, setUploadUrl] = useState<string | null>(null);
+  const [uploadName, setUploadName] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [missed, setMissed] = useState<number | null>(null);
+
   const [enabled, setEnabled] = useState<Record<BodyPartGroup, boolean>>({
     head: true,
     torso: true,
@@ -73,7 +84,53 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
 
   const demo = useMemo(() => buildDemoSequence(), []);
 
-  // Load the selected source (a real swing's keypoints, or the built-in demo).
+  // Start fetching the pose model as soon as the lab opens so the first
+  // upload isn't paying for a cold model download.
+  useEffect(() => {
+    preloadPoseModel();
+  }, []);
+
+  // Release the object URL when the clip is replaced or the lab unmounts.
+  useEffect(() => {
+    return () => {
+      if (uploadUrl) URL.revokeObjectURL(uploadUrl);
+    };
+  }, [uploadUrl]);
+
+  async function handleFile(file: File) {
+    setError(null);
+    setMissed(null);
+    setProgress(0);
+    setFrames(null);
+    setFrameIndex(0);
+    setLoading(true);
+
+    if (uploadUrl) URL.revokeObjectURL(uploadUrl);
+    const url = URL.createObjectURL(file);
+    setUploadUrl(url);
+    setUploadName(file.name);
+    setMode("upload");
+
+    try {
+      const result = await extractPoseFromVideo(file, setProgress);
+      setFrames(result.frames);
+      setMeta({ fps: result.fps, width: result.width, height: result.height });
+      setMissed(result.missedFrames);
+      if (result.missedFrames === result.frames.length) {
+        setError(
+          "No person was detected in any frame. Check the golfer is fully in frame and reasonably lit.",
+        );
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not run pose on that video.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Load keypoints for demo / saved-swing modes.
   useEffect(() => {
     let cancelled = false;
 
@@ -82,16 +139,15 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
       setMeta({ fps: demo.fps, width: demo.width, height: demo.height });
       setFrameIndex(0);
       setError(null);
+      setMissed(null);
       return;
     }
 
-    if (!selectedId) {
-      setFrames(null);
-      return;
-    }
+    if (mode !== "swing" || !selectedId) return;
 
     setLoading(true);
     setError(null);
+    setMissed(null);
     fetch(`/api/swings/${selectedId}/keypoints`, { cache: "no-store" })
       .then(async (res) => {
         const json = await res.json();
@@ -101,11 +157,7 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
       .then((payload) => {
         if (cancelled) return;
         setFrames(toPoseFrames(payload));
-        setMeta({
-          fps: payload.fps,
-          width: payload.width,
-          height: payload.height,
-        });
+        setMeta({ fps: payload.fps, width: payload.width, height: payload.height });
         setFrameIndex(0);
       })
       .catch((err: unknown) => {
@@ -173,22 +225,22 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
     [frames, meta, enabled, showLabels],
   );
 
-  // Follow video playback when a real clip is loaded.
+  // Follow video playback whenever there's a real video element driving it.
+  const videoDriven = mode === "swing" || mode === "upload";
   useEffect(() => {
-    if (mode !== "swing" || !frames || !meta) return;
+    if (!videoDriven || !frames || !meta) return;
     const video = videoRef.current;
     if (!video) return;
 
     const tick = () => {
-      const idx = Math.round(video.currentTime * meta.fps);
-      setFrameIndex(idx);
+      setFrameIndex(Math.round(video.currentTime * meta.fps));
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [mode, frames, meta]);
+  }, [videoDriven, frames, meta]);
 
   // Auto-advance the demo (no video element to drive it).
   useEffect(() => {
@@ -208,19 +260,20 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
     [frames, meta],
   );
   const maxSpeed = motion[0]?.peakSpeed ?? 0;
-
   const currentSwing = swings.find((s) => s.id === selectedId);
+  const videoSrc =
+    mode === "upload" ? uploadUrl : mode === "swing" ? currentSwing?.blobUrl : null;
 
   return (
     <div className="mt-8 space-y-8">
       <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
-          variant={mode === "demo" ? "default" : "outline"}
-          onClick={() => setMode("demo")}
+          variant={mode === "upload" ? "default" : "outline"}
+          onClick={() => setMode("upload")}
           className="h-9"
         >
-          Synthetic demo
+          Upload a video
         </Button>
         <Button
           type="button"
@@ -229,7 +282,15 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
           disabled={swings.length === 0}
           className="h-9"
         >
-          Your swings
+          Analyzed swings
+        </Button>
+        <Button
+          type="button"
+          variant={mode === "demo" ? "default" : "outline"}
+          onClick={() => setMode("demo")}
+          className="h-9"
+        >
+          Synthetic demo
         </Button>
         {mode === "swing" && swings.length > 0 && (
           <select
@@ -246,11 +307,58 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
         )}
       </div>
 
-      {swings.length === 0 && mode === "demo" && (
+      {mode === "upload" && (
+        <div className="space-y-3">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="video/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void handleFile(f);
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
+            className="flex w-full flex-col items-center justify-center rounded-xl border border-dashed border-[color:var(--fairway-soft)] bg-white/60 px-4 py-8 text-center transition hover:bg-white disabled:opacity-60"
+          >
+            <span className="font-medium text-[color:var(--fairway)]">
+              {uploadName ?? "Choose a video to segment"}
+            </span>
+            <span className="mt-1 text-sm text-[color:var(--ink-muted)]">
+              Runs entirely in your browser — nothing is uploaded, any framerate works
+            </span>
+          </button>
+
+          {loading && (
+            <div className="space-y-1">
+              <div className="h-2 overflow-hidden rounded-full bg-[color:var(--mist)]">
+                <div
+                  className="h-full bg-[color:var(--fairway)] transition-all"
+                  style={{ width: `${Math.round(progress * 100)}%` }}
+                />
+              </div>
+              <p className="text-xs text-[color:var(--ink-muted)]">
+                Running pose · {Math.round(progress * 100)}%
+              </p>
+            </div>
+          )}
+
+          {missed != null && missed > 0 && frames && missed < frames.length && (
+            <p className="rounded-lg bg-[color:var(--sand-soft)] px-3 py-2 text-sm text-[color:var(--ink)]">
+              No person found in {missed} of {frames.length} frames — those gaps
+              render empty.
+            </p>
+          )}
+        </div>
+      )}
+
+      {swings.length === 0 && mode === "swing" && (
         <p className="rounded-xl border border-[color:var(--line)] bg-white/70 px-4 py-3 text-sm text-[color:var(--ink-muted)]">
-          No analyzed swings with stored keypoints yet — the synthetic demo below
-          exercises the segmentation renderer on its own. Upload a swing and the
-          real clips will appear here.
+          No analyzed swings with stored keypoints yet.
         </p>
       )}
 
@@ -263,19 +371,18 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
       <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
         <div className="space-y-3">
           <div className="relative overflow-hidden rounded-2xl border border-[color:var(--line)] bg-black">
-            {mode === "swing" && currentSwing && (
+            {videoSrc ? (
               <video
                 ref={videoRef}
-                src={currentSwing.blobUrl}
+                src={videoSrc}
                 controls
                 playsInline
                 className="block max-h-[520px] w-full object-contain"
               />
-            )}
-            {mode === "demo" && (
+            ) : (
               <div
                 className="w-full"
-                style={{ aspectRatio: `${demo.width} / ${demo.height}` }}
+                style={{ aspectRatio: `${demo.width} / ${demo.height}`, maxHeight: 520 }}
               />
             )}
             <canvas
@@ -284,7 +391,7 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
             />
           </div>
 
-          {loading && (
+          {loading && mode !== "upload" && (
             <p className="text-sm text-[color:var(--ink-muted)]">Loading keypoints…</p>
           )}
 
@@ -298,7 +405,7 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
                 onChange={(e) => {
                   const idx = Number(e.target.value);
                   setFrameIndex(idx);
-                  if (mode === "swing" && videoRef.current && meta) {
+                  if (videoDriven && videoRef.current && meta) {
                     videoRef.current.currentTime = idx / meta.fps;
                   }
                 }}
@@ -351,7 +458,7 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
 
           {motion.length === 0 ? (
             <p className="text-sm text-[color:var(--ink-muted)]">
-              No motion data for this clip yet.
+              No motion data yet — segment a clip to populate this.
             </p>
           ) : (
             <ul className="space-y-2">
@@ -384,15 +491,20 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
           )}
 
           <div className="rounded-xl border border-[color:var(--line)] bg-white/70 px-4 py-3 text-xs leading-relaxed text-[color:var(--ink-muted)]">
-            <p className="font-medium text-[color:var(--ink)]">How these regions are built</p>
+            <p className="font-medium text-[color:var(--ink)]">How this works</p>
             <p className="mt-1">
-              Regions are derived geometrically from the RTMPose COCO-17
-              keypoints — no separate segmentation model runs. That keeps this
-              free of extra GPU cost and licence exposure: the obvious
-              pixel-accurate alternatives (Meta&apos;s Sapiens, DensePose) are
-              licensed <strong>CC BY-NC</strong> and cannot ship commercially.
-              If true per-pixel masks are ever needed, SAM (Apache-2.0) prompted
-              with these same keypoints is the clean upgrade path.
+              Regions are derived geometrically from pose keypoints — no separate
+              segmentation model runs. The pixel-accurate alternatives (Meta&apos;s
+              Sapiens, DensePose) are licensed <strong>CC BY-NC</strong> and cannot
+              ship commercially.
+            </p>
+            <p className="mt-2">
+              <strong>Uploaded clips</strong> are posed in-browser with MediaPipe
+              (Apache-2.0) for instant feedback. <strong>Analyzed swings</strong>{" "}
+              use the stored RTMPose keypoints — the same ones your scores and
+              faults are computed from. Expect the RTMPose path to be the more
+              accurate of the two; this lab is for eyeballing regions, not for
+              scoring.
             </p>
           </div>
         </div>
