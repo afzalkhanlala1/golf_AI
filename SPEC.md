@@ -148,7 +148,7 @@ export const AnalysisResult = z.object({
     fullBodyInFrame: z.boolean(),
     warnings: z.array(z.enum([
       "low_fps","low_light","partial_body","multiple_people",
-      "camera_moved","view_ambiguous","short_clip",
+      "camera_moved","view_ambiguous","short_clip","no_swing_detected",
     ])),
   }),
 
@@ -294,8 +294,8 @@ Only surface faults with `severity > 0.25` and `confidence > 0.5`. **Rank them a
 
 ### 7.1 Pipeline
 
-1. **Decode** — `ffprobe` for true fps (container metadata lies). Reject clips under 1s or over 20s. Downsample to max 1080p long edge. Reject clips under 24fps outright; clips from 24–120fps are accepted with a `low_fps` warning and damped confidence (see §7.2).
-2. **Pose** — RTMPose (via `rtmlib`, ONNX runtime, Apache-2.0) top-down with an RTMDet person detector. Track the largest persistent person; flag `multiple_people` if others are present. Emit 17 COCO keypoints + confidence per frame.
+1. **Decode** — `ffprobe` for true fps (container metadata lies). Reject clips under 1s or over 20s. Downsample to max 1080p long edge. Reject clips under 24fps outright; clips from 24–120fps are accepted with a `low_fps` warning and damped confidence (see §7.2). Correct phone display-matrix rotation (`pipeline/orientation.py`) before any downstream processing sees a frame — portrait clips are frequently stored sideways in the encoded stream.
+2. **Pose** — RTMPose (via `rtmlib`, ONNX runtime, Apache-2.0) top-down with an RTMDet person detector. Track the largest persistent person; flag `multiple_people` if others are present. Emit 17 COCO keypoints + confidence per frame. Before event detection, reject clips with no real swing motion (`events.has_swing_motion` — wrist vertical travel under 10% of frame height) rather than emitting event frames off wrist noise.
 3. **Events** — two strategies, in order:
    - If `SWINGNET_CHECKPOINT_URL` is set, load the SwingNet checkpoint and run it. Preprocess exactly as GolfDB's repo does (160×160, its normalization).
    - **Otherwise fall back to a heuristic detector** from wrist-keypoint kinematics: `address` = first sustained low-motion window; `top` = wrist trajectory apex / velocity sign reversal; `impact` = peak wrist speed near the lowest hand position; `finish` = last sustained low-motion window; interpolate the intermediate four. Emit lower confidence values for heuristic events.

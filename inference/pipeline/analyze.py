@@ -9,7 +9,7 @@ from uuid import UUID
 
 from pipeline.blob_io import keypoints_payload, upload_keypoints_gzip
 from pipeline.decode import DecodeError, decode_video, download_video
-from pipeline.events import detect_events
+from pipeline.events import detect_events, has_swing_motion
 from pipeline.metrics import compute_metrics
 from pipeline.pose import run_pose
 from pipeline.view import classify_view
@@ -140,6 +140,25 @@ def analyze_swing(
         warnings.append("multiple_people")
     if not pose.full_body_in_frame:
         warnings.append("partial_body")
+
+    if not has_swing_motion(pose.keypoints, clip.height):
+        return _rejected(
+            swing_id,
+            (
+                "No golf swing motion detected in this clip. Make sure the "
+                "full swing — address through finish — is in frame, and "
+                "that the clip isn't mostly a static setup shot."
+            ),
+            fps=clip.fps,
+            width=clip.width,
+            height=clip.height,
+            frame_count=len(clip.frames),
+            duration_ms=clip.duration_ms,
+            view=claimed_view,
+            warnings=["no_swing_detected", *warnings],
+            pose_conf=float(pose.pose_confidence_mean),
+            full_body=bool(pose.full_body_in_frame),
+        )
 
     detected_view = classify_view(pose.keypoints)
     if detected_view == "unknown":

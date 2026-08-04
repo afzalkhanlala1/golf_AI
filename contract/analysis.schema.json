@@ -87,7 +87,8 @@
                   "multiple_people",
                   "camera_moved",
                   "view_ambiguous",
-                  "short_clip"
+                  "short_clip",
+                  "no_swing_detected"
                 ]
               }
             }

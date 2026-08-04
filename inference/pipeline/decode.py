@@ -14,6 +14,8 @@ import av
 import cv2
 import numpy as np
 
+from pipeline.orientation import apply_rotation, get_rotation_correction
+
 
 @dataclass
 class DecodedClip:
@@ -84,11 +86,18 @@ def decode_video(path: Path, max_long_edge: int = 1080) -> DecodedClip:
     if fps <= 1:
         raise DecodeError("Could not determine a reliable frame rate for this clip.")
 
+    # Portrait phone clips are frequently stored with a display-matrix
+    # rotation rather than physically rotated pixels — correct it up front
+    # so pose detection and every downstream heuristic see an upright body.
+    rotation = get_rotation_correction(str(path))
+
     frames: list[np.ndarray] = []
     width = height = 0
 
     for frame in container.decode(video=0):
         img = frame.to_ndarray(format="rgb24")
+        if rotation:
+            img = apply_rotation(img, rotation)
         h, w = img.shape[:2]
         long_edge = max(h, w)
         if long_edge > max_long_edge:

@@ -21,6 +21,21 @@ EVENT_NAMES = [
 # COCO wrists
 L_WRIST, R_WRIST = 9, 10
 
+# Minimum wrist vertical travel, as a fraction of frame height, to call a
+# clip a real golf swing rather than a static/near-static shot. Ported from
+# a collaborator's independent MediaPipe-based pipeline, which learned this
+# threshold auto-skipping non-swing clips during dataset labeling — reject
+# rather than emit nonsense event frames on a clip with no real motion.
+MIN_SWING_RANGE_FRAC = 0.10
+
+
+def has_swing_motion(keypoints: np.ndarray, frame_height: float) -> bool:
+    if frame_height <= 0 or keypoints.shape[0] == 0:
+        return True
+    y = _wrist_series(keypoints)[:, 1]
+    y_range = float(np.nanmax(y) - np.nanmin(y))
+    return (y_range / frame_height) >= MIN_SWING_RANGE_FRAC
+
 
 def _wrist_series(keypoints: np.ndarray) -> np.ndarray:
     """Prefer the wrist with higher mean confidence; return (T, 2) xy."""
@@ -46,10 +61,15 @@ def detect_events_heuristic(
 ) -> list[dict]:
     """
     address = first sustained low-motion window
-    top = wrist trajectory apex / velocity sign reversal
-    impact = peak wrist speed near lowest hand position
+    top = wrist trajectory apex, bounded before the frame of peak wrist speed
+    impact = peak wrist speed, bounded by hands returning to ~address height
     finish = last sustained low-motion window
     intermediate four interpolated
+
+    The top/impact bounding follows a collaborator's independently-developed
+    MediaPipe pipeline: unbounded "max speed after top" frequently lands in
+    the release/early follow-through instead of impact, because hand speed
+    often keeps climbing past contact rather than peaking exactly at it.
     """
     T = keypoints.shape[0]
     if T < 8:
@@ -78,25 +98,41 @@ def detect_events_heuristic(
     address = sustained_low(0, True)
     finish = sustained_low(T - 1, False)
 
-    # Top: minimum wrist y (apex in image coords) in middle portion with vel reversal
-    mid0, mid1 = int(T * 0.15), int(T * 0.75)
-    segment = y[mid0:mid1]
-    if len(segment) == 0:
-        top = T // 3
-    else:
-        top = mid0 + int(np.argmin(segment))
+    # Top: lowest wrist y (apex in image coords) between address and the
+    # frame of peak wrist speed in the whole clip. Peak speed happens during
+    # the downswing, strictly after the top — bounding the apex search by it
+    # (rather than a fixed fractional window) holds up across swings with
+    # very different backswing/downswing proportions.
+    top_search_end = int(np.argmax(speed))
+    if top_search_end <= address + 2:
+        top_search_end = T - 1
+    segment = y[address : top_search_end + 1]
+    top = address + int(np.argmin(segment)) if len(segment) else address + T // 3
+    if top <= address:
+        top = min(address + max(2, T // 6), T - 2)
 
-    # Impact: peak speed after top, near a local y maximum (hands low)
-    after = speed[top:]
-    if len(after) < 2:
-        impact = min(top + 1, T - 1)
+    # Impact: peak speed within a window bounded by the hands returning to
+    # roughly address height. The margin is a fraction of this swing's own
+    # observed wrist travel, not an absolute pixel value, so it holds across
+    # camera distances/resolutions.
+    address_y = y[address]
+    y_range = float(np.nanmax(y) - np.nanmin(y))
+    margin = max(2.0, 0.06 * y_range)
+    return_idx = None
+    for i in range(top + 1, T):
+        if y[i] >= address_y - margin:
+            return_idx = i
+            break
+
+    if return_idx is None:
+        # Hands never returned to ~address height — fall back to the plain
+        # velocity-peak search over the rest of the clip.
+        after = speed[top:]
+        impact = top + (int(np.argmax(after)) if len(after) else 1)
     else:
-        # Prefer peaks in the lower half of the post-top window
-        impact = top + int(np.argmax(after))
-        # Nudge toward lowest hand y near that peak
-        lo = max(top, impact - 5)
-        hi = min(T, impact + 6)
-        impact = lo + int(np.argmax(y[lo:hi]))
+        buffer = max(2, (return_idx - top) // 4)
+        window_end = min(T - 1, return_idx + buffer)
+        impact = top + int(np.argmax(speed[top : window_end + 1]))
 
     # Ordering guards
     address = max(0, min(address, top - 2))

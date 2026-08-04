@@ -37,6 +37,7 @@ export const QualityWarning = z.enum([
   "camera_moved",
   "view_ambiguous",
   "short_clip",
+  "no_swing_detected",
 ]);
 export type QualityWarning = z.infer<typeof QualityWarning>;
 

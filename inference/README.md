@@ -6,9 +6,9 @@ Scoring and TPI faults stay in TypeScript (`src/lib/scoring/`).
 
 ## Pipeline
 
-1. **Decode** — `ffprobe` true fps; reject &lt;1s / &gt;20s; max 1080p long edge; reject &lt;24fps outright, warn + damp confidence 24–120fps
-2. **Pose** — RTMDet + RTMPose (COCO-17) via `rtmlib` / ONNX Runtime; largest person; `multiple_people` warning
-3. **Events** — heuristic wrist kinematics first; if `SWINGNET_CHECKPOINT_URL` is set, try SwingNet then fall back
+1. **Decode** — `ffprobe` true fps; reject &lt;1s / &gt;20s; max 1080p long edge; reject &lt;24fps outright, warn + damp confidence 24–120fps; correct phone display-matrix rotation (`pipeline/orientation.py`)
+2. **Pose** — RTMDet + RTMPose (COCO-17) via `rtmlib` / ONNX Runtime; largest person; `multiple_people` warning; reject clips with no real swing motion (`no_swing_detected`)
+3. **Events** — heuristic wrist kinematics first (impact bounded by hands returning to address height, not unbounded peak speed — see `events.py` docstring); if `SWINGNET_CHECKPOINT_URL` is set, try SwingNet then fall back
 4. **View** — face-on / down-the-line / unknown (+ `view_ambiguous`)
 5. **Metrics** — SPEC §7.2 keys only (no faults)
 6. **Keypoints** — gzip JSON → Vercel Blob
