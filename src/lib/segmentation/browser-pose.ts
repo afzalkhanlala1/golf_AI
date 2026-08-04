@@ -77,6 +77,13 @@ export function mediapipeToCoco(
   });
 }
 
+/**
+ * Below this, pose keypoints get too coarse to trust — the Kaggle
+ * `videos-160` GolfDB mirror is 160x160, which the build plan flags as
+ * fine for training SwingNet but far too small for quality pose.
+ */
+export const LOW_RESOLUTION_EDGE = 320;
+
 export type ExtractionResult = {
   frames: PoseFrame[];
   fps: number;
@@ -84,6 +91,8 @@ export type ExtractionResult = {
   height: number;
   /** Frames where no person was found at all. */
   missedFrames: number;
+  /** True when the clip's long edge is under LOW_RESOLUTION_EDGE. */
+  lowResolution: boolean;
 };
 
 let landmarkerPromise: Promise<{
@@ -170,11 +179,33 @@ export async function extractPoseFromVideo(
   try {
     await new Promise<void>((resolve, reject) => {
       const onReady = () => {
-        video.removeEventListener("loadedmetadata", onReady);
+        cleanup();
         resolve();
       };
+      const onError = () => {
+        cleanup();
+        // MEDIA_ERR_SRC_NOT_SUPPORTED (4) almost always means the container
+        // decoded but the video codec did not. Worth naming explicitly:
+        // GolfDB / Kaggle videos-160 clips are MPEG-4 Part 2 (tag mp4v),
+        // which no browser decodes, and "could not read the file" sends
+        // people hunting for a corrupt download that isn't the problem.
+        const code = video.error?.code;
+        if (code === 4 || code === 3) {
+          reject(
+            new Error(
+              "This video's codec isn't supported by browsers (common with GolfDB/Kaggle clips, which are MPEG-4 Part 2 rather than H.264). Convert it first: ffmpeg -i input.mp4 -c:v libx264 -pix_fmt yuv420p output.mp4 — or run it through the normal swing upload and view it here under “Analyzed swings”, which uses the server's decoder and better pose.",
+            ),
+          );
+          return;
+        }
+        reject(new Error("Could not read that video file."));
+      };
+      const cleanup = () => {
+        video.removeEventListener("loadedmetadata", onReady);
+        video.removeEventListener("error", onError);
+      };
       video.addEventListener("loadedmetadata", onReady);
-      video.addEventListener("error", () => reject(new Error("Could not read that video file.")));
+      video.addEventListener("error", onError);
     });
 
     const duration = video.duration;
@@ -221,7 +252,14 @@ export async function extractPoseFromVideo(
     }
 
     onProgress?.(1);
-    return { frames, fps, width, height, missedFrames };
+    return {
+      frames,
+      fps,
+      width,
+      height,
+      missedFrames,
+      lowResolution: Math.max(width, height) < LOW_RESOLUTION_EDGE,
+    };
   } finally {
     URL.revokeObjectURL(url);
     video.src = "";

@@ -73,6 +73,7 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
   const [uploadName, setUploadName] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [missed, setMissed] = useState<number | null>(null);
+  const [lowRes, setLowRes] = useState<{ w: number; h: number } | null>(null);
 
   const [enabled, setEnabled] = useState<Record<BodyPartGroup, boolean>>({
     head: true,
@@ -100,6 +101,7 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
   async function handleFile(file: File) {
     setError(null);
     setMissed(null);
+    setLowRes(null);
     setProgress(0);
     setFrames(null);
     setFrameIndex(0);
@@ -116,6 +118,9 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
       setFrames(result.frames);
       setMeta({ fps: result.fps, width: result.width, height: result.height });
       setMissed(result.missedFrames);
+      setLowRes(
+        result.lowResolution ? { w: result.width, h: result.height } : null,
+      );
       if (result.missedFrames === result.frames.length) {
         setError(
           "No person was detected in any frame. Check the golfer is fully in frame and reasonably lit.",
@@ -345,6 +350,16 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
                 Running pose · {Math.round(progress * 100)}%
               </p>
             </div>
+          )}
+
+          {lowRes && (
+            <p className="rounded-lg bg-[color:var(--sand-soft)] px-3 py-2 text-sm text-[color:var(--ink)]">
+              This clip is {lowRes.w}×{lowRes.h}. Pose at that size is coarse,
+              so regions will look rough — fine for checking the plumbing, not
+              for judging accuracy. (The GolfDB Kaggle mirror is 160×160 for
+              exactly this reason; source higher-resolution clips for real
+              pose work.)
+            </p>
           )}
 
           {missed != null && missed > 0 && frames && missed < frames.length && (

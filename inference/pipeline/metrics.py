@@ -104,6 +104,32 @@ def _inclination(p0: np.ndarray, p1: np.ndarray) -> float:
     return float(np.degrees(np.arctan2(d[1], d[0])))
 
 
+def _angle_delta(a: float, b: float) -> float:
+    """Signed smallest rotation from b to a, wrapped to (-180, 180].
+
+    Raw inclinations come out of atan2 in (-180, 180], so a shoulder line
+    crossing the wrap point (e.g. 176 deg -> -176 deg) yields a 352 deg
+    'turn' when the real rotation is 8 deg. Every rotation comparison must
+    go through here.
+    """
+    return float((a - b + 180.0) % 360.0 - 180.0)
+
+
+def _line_rotation(
+    l0: np.ndarray, r0: np.ndarray, l1: np.ndarray, r1: np.ndarray
+) -> float:
+    """Absolute rotation of the l->r line between two frames, in degrees.
+
+    A shoulder/hip line is undirected: swapping which end is 'left' flips
+    the inclination by 180 deg without the body having moved, so fold the
+    result into [0, 90] and take the smaller equivalent rotation.
+    """
+    delta = abs(_angle_delta(_inclination(l1, r1), _inclination(l0, r0)))
+    if delta > 90.0:
+        delta = 180.0 - delta
+    return delta
+
+
 def _angle_from_vertical(hip: np.ndarray, shoulder: np.ndarray) -> float:
     v = shoulder - hip
     return float(np.degrees(np.arctan2(v[0], -v[1] + 1e-9)))
@@ -132,6 +158,39 @@ def _shoulder_w(kpts: np.ndarray, t: int) -> Optional[float]:
         return None
     w = float(np.linalg.norm(ls - rs))
     return w if w > 1e-3 else None
+
+
+def _torso_len(kpts: np.ndarray, t: int) -> Optional[float]:
+    """Mid-hip to mid-shoulder distance."""
+    mh = _mid(_xy(kpts, t, L_HIP), _xy(kpts, t, R_HIP))
+    ms = _mid(_xy(kpts, t, L_SHOULDER), _xy(kpts, t, R_SHOULDER))
+    if mh is None or ms is None:
+        return None
+    d = float(np.linalg.norm(ms - mh))
+    return d if d > 1e-3 else None
+
+
+def _body_scale(kpts: np.ndarray, t: int) -> Optional[float]:
+    """Robust length reference for normalising translations.
+
+    Shoulder width alone is not safe: from a down-the-line view the shoulders
+    line up with the camera and their 2D separation collapses toward zero,
+    so dividing by it inflates every normalised metric (this produced a
+    head_movement of 14.8 on a real GolfDB down-the-line clip, against a
+    0-0.15 target). Torso length barely changes between views, so fall back
+    to it whenever the shoulder width looks foreshortened.
+    """
+    sw = _shoulder_w(kpts, t)
+    tl = _torso_len(kpts, t)
+    if sw is None:
+        return tl
+    if tl is None:
+        return sw
+    # A real shoulder width is roughly 0.8-1.4x torso length. Much below
+    # that means the view is foreshortening it, not that the golfer is narrow.
+    if sw < 0.55 * tl:
+        return tl
+    return sw
 
 
 def _stance_w(kpts: np.ndarray, t: int) -> Optional[float]:
@@ -253,14 +312,17 @@ def compute_metrics(
     ls_a, rs_a = _xy(keypoints, address, L_SHOULDER), _xy(keypoints, address, R_SHOULDER)
     ls_t, rs_t = _xy(keypoints, top, L_SHOULDER), _xy(keypoints, top, R_SHOULDER)
     if all(p is not None for p in (ls_a, rs_a, ls_t, rs_t)):
-        st = abs(_inclination(ls_t, rs_t) - _inclination(ls_a, rs_a))  # type: ignore[arg-type]
+        st = _line_rotation(ls_a, rs_a, ls_t, rs_t)  # type: ignore[arg-type]
         out.append(_metric("shoulder_turn_top", st, conf))
-        out.append(_metric("shoulder_plane_top", abs(_inclination(ls_t, rs_t)), conf))  # type: ignore[arg-type]
+        plane = abs(_angle_delta(_inclination(ls_t, rs_t), 0.0))  # type: ignore[arg-type]
+        if plane > 90.0:
+            plane = 180.0 - plane
+        out.append(_metric("shoulder_plane_top", plane, conf))
 
     lh_a, rh_a = _xy(keypoints, address, L_HIP), _xy(keypoints, address, R_HIP)
     lh_t, rh_t = _xy(keypoints, top, L_HIP), _xy(keypoints, top, R_HIP)
     if all(p is not None for p in (lh_a, rh_a, lh_t, rh_t)):
-        ht = abs(_inclination(lh_t, rh_t) - _inclination(lh_a, rh_a))  # type: ignore[arg-type]
+        ht = _line_rotation(lh_a, rh_a, lh_t, rh_t)  # type: ignore[arg-type]
         out.append(_metric("hip_turn_top", ht, conf))
 
     keys = {m["key"]: m["value"] for m in out}
@@ -290,7 +352,17 @@ def compute_metrics(
     if mh_t is not None and ms_t is not None:
         out.append(_metric("spine_tilt_top", _angle_from_vertical(mh_t, ms_t), conf * 0.9))
 
+    # Hip-normalised translations are only meaningful when the hip line is
+    # actually resolved across the frame. From down-the-line the hips align
+    # with the camera and their 2D width collapses, so dividing by it yields
+    # nonsense (a real GolfDB DTL clip produced hip_lateral_downswing = 2.40
+    # against a 0-0.08 target, which would then trip a bogus "slide" fault).
+    # Omit rather than emit a confident wrong number — SPEC 7.3.
     hw = _hip_w(keypoints, address)
+    _torso = _torso_len(keypoints, address)
+    if hw is not None and _torso is not None and hw < 0.30 * _torso:
+        hw = None
+
     if hw and mh_a is not None and mh_i is not None:
         dy = mh_i[1] - mh_a[1]
         out.append(_metric("hip_depth_change_downswing", max(0.0, dy / hw), conf))
@@ -305,7 +377,7 @@ def compute_metrics(
             _metric("hip_lateral_downswing", abs(mh_i[0] - mh_a[0]) / hw, conf)
         )
 
-    sw = _shoulder_w(keypoints, address)
+    sw = _body_scale(keypoints, address)
     nose0 = _xy(keypoints, address, NOSE)
     if sw and nose0 is not None:
         max_d = 0.0

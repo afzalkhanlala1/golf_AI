@@ -97,6 +97,7 @@ def detect_events_heuristic(
 
     address = sustained_low(0, True)
     finish = sustained_low(T - 1, False)
+    quiet = thr * 1.5
 
     # Top: lowest wrist y (apex in image coords) between address and the
     # frame of peak wrist speed in the whole clip. Peak speed happens during
@@ -110,6 +111,22 @@ def detect_events_heuristic(
     top = address + int(np.argmin(segment)) if len(segment) else address + T // 3
     if top <= address:
         top = min(address + max(2, T // 6), T - 2)
+
+    # Refine address by walking BACKWARD from the top rather than forward
+    # from frame 0. A clip that opens with a long static setup (or a waggle)
+    # makes the first quiet window frame 0, which stretches the "backswing"
+    # across the whole clip — GolfDB clip 2.mp4 produced a 5.1s backswing and
+    # a tempo_ratio of 13.9 that way. The takeaway is the last quiet moment
+    # before the continuous run of motion that ends at the top.
+    i = top - 1
+    while i > 0 and speed[i] < quiet:  # skip any pause at the top
+        i -= 1
+    while i > 0 and speed[i] >= quiet:  # walk back through the backswing
+        i -= 1
+    # Only trust it if it leaves a plausible backswing; otherwise keep the
+    # forward-scanned address.
+    if 0 <= i < top - 2:
+        address = max(address, i)
 
     # Impact: peak speed within a window bounded by the hands returning to
     # roughly address height. The margin is a fraction of this swing's own
@@ -137,6 +154,14 @@ def detect_events_heuristic(
     # Ordering guards
     address = max(0, min(address, top - 2))
     impact = max(top + 1, min(impact, finish - 1 if finish > top else T - 2))
+
+    # A clip that ends mid-follow-through has no settled finish for the
+    # backward low-motion search to land on, so it walks all the way back
+    # past impact. Clamping to impact+1 there would squash the entire
+    # follow-through into a single frame; the end of the clip is the honest
+    # answer instead. (Seen on GolfDB clips, which are trimmed tight.)
+    if finish <= impact:
+        finish = T - 1
     finish = max(impact + 1, min(finish, T - 1))
 
     def lerp(a: int, b: int, t: float) -> int:
