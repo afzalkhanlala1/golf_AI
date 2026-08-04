@@ -22,6 +22,7 @@ export default async function middleware(
     "/upload(.*)",
     "/swings(.*)",
     "/progress(.*)",
+    "/lab(.*)",
   ]);
 
   return clerkMiddleware(async (auth, request) => {
