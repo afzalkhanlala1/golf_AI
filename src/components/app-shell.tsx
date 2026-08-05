@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { UserMenu } from "@/components/user-menu";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { isAuthDisabled } from "@/lib/auth-mode";
 
 const links = [
@@ -28,6 +29,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {l.label}
               </Link>
             ))}
+            <ThemeToggle />
             <UserMenu authDisabled={isAuthDisabled()} />
           </nav>
         </div>

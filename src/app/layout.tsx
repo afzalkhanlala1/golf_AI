@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Fraunces, Source_Sans_3 } from "next/font/google";
 import { isAuthDisabled } from "@/lib/auth-mode";
+import { THEME_INIT_SCRIPT } from "@/components/theme-toggle";
 import "./globals.css";
 
 const display = Fraunces({
@@ -25,7 +26,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const shell = (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Sets the theme class before first paint — see THEME_INIT_SCRIPT. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className={`${display.variable} ${sans.variable} antialiased`}>
         {children}
       </body>

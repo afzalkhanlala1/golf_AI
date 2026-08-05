@@ -93,8 +93,23 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
+  /* Brand tokens re-pointed for dark. Not an inversion — the fairway green
+     is lightened so it still reads as the accent against a dark surface,
+     rather than disappearing into it. */
+  --fairway: #7fc9a4;
+  --fairway-soft: #4f9e79;
+  --sand: #d0a274;
+  --sand-soft: #3a2f22;
+  --fog: #121714;
+  --mist: #1e2723;
+  --ink: #e8efe9;
+  --ink-muted: #9aaba0;
+  --line: #2c3833;
+
+  --background: #121714;
+  --foreground: #e8efe9;
+  --primary: #7fc9a4;
+  --primary-foreground: #0d1310;
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
@@ -138,6 +153,15 @@
       radial-gradient(ellipse 60% 40% at 100% 0%, #efe4d4 0%, transparent 45%),
       linear-gradient(180deg, #f7faf6 0%, var(--fog) 40%, #eef3ef 100%);
     background-attachment: fixed;
+    color-scheme: light;
+  }
+  .dark body {
+    /* Same three-layer wash, re-mixed for a dark surface. */
+    background-image:
+      radial-gradient(ellipse 80% 50% at 10% -10%, #1b2a22 0%, transparent 55%),
+      radial-gradient(ellipse 60% 40% at 100% 0%, #2a2318 0%, transparent 45%),
+      linear-gradient(180deg, #0f1512 0%, var(--fog) 40%, #10160f 100%);
+    color-scheme: dark;
   }
   html {
     @apply font-sans;

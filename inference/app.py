@@ -102,11 +102,20 @@ def _failure_payload(swing_id: str, view: str, message: str) -> dict:
     }
 
 
+# GPU is opt-in, and off by default.
+#
+# The default pose backend (MediaPipe) runs on CPU — it never touched the
+# T4 this used to reserve unconditionally, so every analysis was paying GPU
+# rates for CPU work. Set INFERENCE_GPU=T4 (or any Modal GPU string) only
+# if you switch back to POSE_BACKEND=rtmpose, which does use it.
+_GPU = os.environ.get("INFERENCE_GPU") or None
+
+
 @app.cls(
     image=inference_image,
-    gpu="T4",
+    gpu=_GPU,
     timeout=600,
-    memory=8192,
+    memory=4096,
     secrets=secrets,
 )
 class InferenceService:

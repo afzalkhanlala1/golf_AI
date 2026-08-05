@@ -2,6 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { SwingPlayer } from "@/components/swing-player";
+
+/**
+ * Which body region each TPI fault should light up in the overlay, so a
+ * fault card and the skeleton agree about where the problem is.
+ */
+const FAULT_REGION: Record<string, string> = {
+  s_posture: "torso",
+  c_posture: "torso",
+  loss_of_posture: "torso",
+  reverse_spine_angle: "torso",
+  early_extension: "torso",
+  flat_shoulder_plane: "torso",
+  over_the_top: "arms",
+  casting: "arms",
+  chicken_wing: "arms",
+  sway: "legs",
+  slide: "legs",
+  hanging_back: "legs",
+};
 
 type SwingPayload = {
   swing: {
@@ -181,21 +201,18 @@ export function SwingResult({ id }: { id: string }) {
 
       <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-4">
-          <video
-            src={swing.blobUrl}
-            controls
-            className="aspect-[9/16] max-h-[520px] w-full rounded-xl bg-black object-contain sm:aspect-video"
+          <SwingPlayer
+            swingId={swing.id}
+            blobUrl={swing.blobUrl}
+            events={events}
+            faultRegions={[
+              ...new Set(
+                faults
+                  .map((f) => FAULT_REGION[f.code])
+                  .filter((r): r is string => !!r),
+              ),
+            ]}
           />
-          <div className="flex flex-wrap gap-2">
-            {events.map((e) => (
-              <span
-                key={e.event}
-                className="rounded-full bg-[color:var(--mist)] px-2.5 py-1 text-xs text-[color:var(--ink-muted)]"
-              >
-                {e.event.replaceAll("_", " ")} · {(e.timestampMs / 1000).toFixed(2)}s
-              </span>
-            ))}
-          </div>
         </div>
 
         <div className="space-y-6">
