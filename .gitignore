@@ -68,3 +68,11 @@ SPEC.md.txt
 
 .vercel
 .env*
+
+# Local test clips — do not commit video into the repo
+Test vedio *.mp4
+*.mp4
+
+# Pose model weights — downloaded at image build / on demand, never committed
+inference/models/
+*.task

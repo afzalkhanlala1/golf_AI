@@ -18,7 +18,7 @@ app = modal.App("golf-ai-inference")
 
 inference_image = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("ffmpeg", "libgl1", "libglib2.0-0")
+    .apt_install("ffmpeg", "libgl1", "libglib2.0-0", "curl")
     .pip_install(
         "fastapi>=0.115.0",
         "uvicorn[standard]>=0.32.0",
@@ -29,9 +29,20 @@ inference_image = (
         "httpx>=0.27.0",
         "onnxruntime-gpu>=1.19.0",
         "rtmlib>=0.0.13",
+        # Default pose backend — matches the collaborator's pipeline.
+        "mediapipe>=0.10.14",
         "torch>=2.2.0",
         "torchvision>=0.17.0",
         "Pillow>=10.0.0",
+    )
+    # Bake the pose model into the image so a cold start never pays for a
+    # model download. `full` matches the collaborator's production
+    # model_complexity=1.
+    .run_commands(
+        "mkdir -p /root/models",
+        "curl -sSL -o /root/models/pose_landmarker_full.task "
+        "https://storage.googleapis.com/mediapipe-models/pose_landmarker/"
+        "pose_landmarker_full/float16/1/pose_landmarker_full.task",
     )
     .env({"PYTHONPATH": "/root"})
     .add_local_dir(
@@ -103,6 +114,8 @@ class InferenceService:
     def startup(self) -> None:
         from pipeline.pose import init_pose_model
 
+        # MediaPipe (the default backend) runs on CPU; the device argument
+        # only matters if POSE_BACKEND=rtmpose.
         try:
             init_pose_model("cuda")
         except Exception:

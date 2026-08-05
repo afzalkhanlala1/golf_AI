@@ -289,6 +289,7 @@ def compute_metrics(
     events: list[dict],
     fps: float,
     pose_confidence_mean: float,
+    limbs: Optional[list[dict[str, Any]]] = None,
 ) -> list[dict[str, Any]]:
     """Return Metric[] matching contract/analysis.schema. Omit unreliable keys."""
     address = _ef(events, "address")
@@ -388,24 +389,26 @@ def compute_metrics(
             max_d = max(max_d, float(np.linalg.norm(n - nose0)))
         out.append(_metric("head_movement", max_d / sw, conf))
 
-    def lead_arm(t: int) -> Optional[float]:
-        for s, e, w in (
-            (L_SHOULDER, L_ELBOW, L_WRIST),
-            (R_SHOULDER, R_ELBOW, R_WRIST),
-        ):
-            a, b, c = _xy(keypoints, t, s), _xy(keypoints, t, e), _xy(keypoints, t, w)
-            if a is not None and b is not None and c is not None:
-                ang = _joint_angle(a, b, c)
-                if not np.isnan(ang):
-                    return ang
-        return None
-
-    lat = lead_arm(top)
-    if lat is not None:
-        out.append(_metric("lead_arm_angle_top", lat, conf))
-    lai = lead_arm(impact)
-    if lai is not None:
-        out.append(_metric("lead_arm_angle_impact", lai, conf))
+    # Lead-arm angles come from the reliability-gated path (posture.py), not
+    # from a raw single-frame angle here.
+    #
+    # A single frame's elbow angle is not a measurement. On both real test
+    # clips the naive version emitted ~22 deg at impact — physically
+    # impossible at strike — while the gated measurement of the same joint
+    # refused outright, with the frames around impact disagreeing by over
+    # 140 deg. Emitting the naive number would hand detectChickenWing a
+    # guaranteed false positive and put a fabricated fault in front of a
+    # golfer. If the gate says the joint is untrustworthy, the metric is
+    # omitted; missing is honest, wrong is not.
+    for lm in limbs or []:
+        if lm["limb"] != "arm" or lm["role"] != "lead" or not lm["scorable"]:
+            continue
+        if lm["event"] == "top":
+            out.append(_metric("lead_arm_angle_top", lm["valueDeg"], lm["confidence"]))
+        elif lm["event"] == "impact":
+            out.append(
+                _metric("lead_arm_angle_impact", lm["valueDeg"], lm["confidence"])
+            )
 
     peaks = _kinematic_peaks(keypoints, top, impact)
     if peaks:

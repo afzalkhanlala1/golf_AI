@@ -137,7 +137,7 @@ def analyze_swing(
     if clip.duration_ms < 3000:
         warnings.append("short_clip")
 
-    pose = run_pose(clip.frames)
+    pose = run_pose(clip.frames, clip.fps)
     if pose.multiple_people:
         warnings.append("multiple_people")
     if not pose.full_body_in_frame:
@@ -173,11 +173,12 @@ def analyze_swing(
         view = detected_view if detected_view != "unknown" else claimed_view
 
     events = detect_events(pose.keypoints, clip.frames, clip.fps)
-    metrics = compute_metrics(
-        pose.keypoints, events, clip.fps, pose.pose_confidence_mean
-    )
-
+    # Gated limb measurements first — compute_metrics sources its lead-arm
+    # angles from these rather than from raw single frames.
     limbs = compute_limb_measurements(pose.keypoints, events)
+    metrics = compute_metrics(
+        pose.keypoints, events, clip.fps, pose.pose_confidence_mean, limbs
+    )
 
     if clip.fps < PREFERRED_MIN_FPS:
         for e in events:

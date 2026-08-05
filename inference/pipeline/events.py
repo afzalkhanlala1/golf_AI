@@ -55,6 +55,31 @@ def _smooth(x: np.ndarray, win: int = 5) -> np.ndarray:
     return np.convolve(xp, kernel, mode="valid")
 
 
+def _median_filter(x: np.ndarray, win: int = 5) -> np.ndarray:
+    """Median filter — rejects single-frame outliers outright.
+
+    A box/mean filter cannot be used for the wrist-speed series. Pose
+    keypoints jitter, and one bad frame produces a speed spike that a mean
+    filter merely SPREADS across the window instead of removing. On real
+    footage that is not a small error: Test video 1 had a spurious 46.1
+    px/frame spike at frame 61 — larger than the swing's true peak of ~32 at
+    impact — which captured `argmax(speed)`, dragged the top-of-backswing
+    search to a mid-backswing frame, and put impact one frame after top.
+    A median over the same window discards it entirely.
+
+    Same lesson the limb angles already apply in posture.py: for a noisy
+    per-frame signal, take the median, never the mean.
+    """
+    if len(x) < win:
+        return x
+    pad = win // 2
+    xp = np.pad(x, (pad, pad), mode="edge")
+    out = np.empty_like(x, dtype=np.float64)
+    for i in range(len(x)):
+        out[i] = np.median(xp[i : i + win])
+    return out
+
+
 def detect_events_heuristic(
     keypoints: np.ndarray,
     fps: float,
@@ -77,8 +102,11 @@ def detect_events_heuristic(
 
     xy = _wrist_series(keypoints)
     speed = np.linalg.norm(np.diff(xy, axis=0, prepend=xy[:1]), axis=1)
-    speed = _smooth(speed, 5)
-    y = _smooth(xy[:, 1], 5)
+    # Median first to kill jitter spikes, then a light mean pass to smooth
+    # what survives. Order matters — meaning first would already have
+    # smeared a spike across its neighbours.
+    speed = _smooth(_median_filter(speed, 5), 3)
+    y = _smooth(_median_filter(xy[:, 1], 5), 3)
 
     # Low motion threshold
     thr = max(float(np.percentile(speed, 20)), 1e-3)

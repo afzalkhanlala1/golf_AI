@@ -1,7 +1,32 @@
-"""RTMPose top-down pose via rtmlib (ONNX Runtime)."""
+"""
+Pose estimation.
+
+Default backend is MediaPipe Pose, matching the collaborator's pipeline
+(AdanNazir/golf-swing-analysis) exactly — same solution, same
+model_complexity, same confidence thresholds, same temporal-tracking and
+per-clip reset behaviour — so both projects measure from identical
+landmarks and their analysis work transfers without a translation layer.
+
+RTMPose remains available behind POSE_BACKEND=rtmpose. It is the more
+accurate backbone (see the build plan's model comparison), so keeping it
+one env var away means the choice can be revisited without a code change.
+
+Both backends emit the same COCO-17 (T, 17, 3) array of x, y, confidence,
+so everything downstream is backend-agnostic.
+
+NOTE ON DATA PROTECTION: neither backend changes your GDPR position by
+itself. Both process the same video of the same identifiable person, in
+the same place. What matters legally is *where* processing happens, what
+is retained, and on what lawful basis — not which pose model runs. The
+genuine privacy win available from MediaPipe is that it can run fully
+on-device (see src/lib/segmentation/browser-pose.ts), so video never
+leaves the user's device at all; running it server-side here is
+architecturally identical to running RTMPose server-side.
+"""
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Optional
 
@@ -18,23 +43,89 @@ class PoseSequence:
     full_body_in_frame: bool
 
 
+# MediaPipe emits 33 landmarks; index i here is the MediaPipe landmark that
+# supplies COCO-17 keypoint i. Mirrors the mapping used in the browser path
+# (src/lib/segmentation/browser-pose.ts) — keep the two in step.
+MP_TO_COCO = [
+    0,   # nose
+    2,   # left eye
+    5,   # right eye
+    7,   # left ear
+    8,   # right ear
+    11,  # left shoulder
+    12,  # right shoulder
+    13,  # left elbow
+    14,  # right elbow
+    15,  # left wrist
+    16,  # right wrist
+    23,  # left hip
+    24,  # right hip
+    25,  # left knee
+    26,  # right knee
+    27,  # left ankle
+    28,  # right ankle
+]
+
 _BODY = None
+_MP_POSE = None
 _DEVICE = "cpu"
+
+# Baked into the image at build time (see app.py) so no model download
+# happens on a cold start. `full` corresponds to the collaborator's
+# production model_complexity=1.
+_MODEL_PATH = os.environ.get(
+    "MEDIAPIPE_POSE_MODEL", "/root/models/pose_landmarker_full.task"
+)
+
+
+def _backend() -> str:
+    return os.environ.get("POSE_BACKEND", "mediapipe").strip().lower()
 
 
 def init_pose_model(device: str = "cuda") -> None:
-    """Load RTMDet/YOLOX detector + RTMPose (balanced mode)."""
-    global _BODY, _DEVICE
+    """Warm the configured backend. `device` is honoured by RTMPose only —
+    MediaPipe Pose runs on CPU here, which is also why this service no
+    longer strictly needs a GPU when MediaPipe is the backend."""
+    global _BODY, _MP_POSE, _DEVICE
     _DEVICE = device
-    from rtmlib import Body
 
-    # mode=balanced → YOLOX-m det + RTMPose-m (COCO-17 body). Apache-2.0 weights.
-    _BODY = Body(
-        mode="balanced",
-        device=device,
-        backend="onnxruntime",
-        to_openpose=False,
+    if _backend() == "rtmpose":
+        from rtmlib import Body
+
+        # mode=balanced → YOLOX-m det + RTMPose-m (COCO-17). Apache-2.0.
+        _BODY = Body(
+            mode="balanced",
+            device=device,
+            backend="onnxruntime",
+            to_openpose=False,
+        )
+        return
+
+    from mediapipe.tasks.python import vision as mp_vision
+    from mediapipe.tasks.python.core.base_options import BaseOptions
+
+    # Tasks API, not the legacy mp.solutions.pose — for the reason the
+    # collaborator documents in tools/extract_landmarks.py: the browser
+    # runtime (@mediapipe/tasks-vision, used by our own segmentation lab)
+    # runs the Tasks-API model family, and the legacy API would silently
+    # produce a different model's landmark distribution than what runs
+    # client-side. The legacy API is also simply gone from current
+    # mediapipe builds.
+    #
+    # RunningMode.VIDEO tracks landmarks temporally across consecutive
+    # frames, which is what static_image_mode=False bought on the legacy
+    # API. Confidences are left permissive at 0.3 — posture.py's
+    # reliability gates decide what is trustworthy, rather than discarding
+    # landmarks here where that judgement can't be made.
+    options = mp_vision.PoseLandmarkerOptions(
+        base_options=BaseOptions(model_asset_path=_MODEL_PATH),
+        running_mode=mp_vision.RunningMode.VIDEO,
+        num_poses=1,
+        min_pose_detection_confidence=0.3,
+        min_tracking_confidence=0.3,
+        min_pose_presence_confidence=0.3,
     )
+    _MP_POSE = mp_vision.PoseLandmarker.create_from_options(options)
 
 
 def _largest_person(keypoints: np.ndarray, scores: np.ndarray) -> Optional[int]:
@@ -65,7 +156,70 @@ def _full_body(kpt: np.ndarray, conf: np.ndarray, w: int, h: int) -> bool:
     return True
 
 
-def run_pose(frames: list[np.ndarray]) -> PoseSequence:
+def _run_mediapipe(frames: list[np.ndarray], fps: float = 30.0) -> PoseSequence:
+    global _MP_POSE
+    import mediapipe as mp
+
+    # A fresh landmarker per clip: RunningMode.VIDEO carries tracking state
+    # forward, and reusing one instance across clips biases the opening
+    # frames of each video toward wherever the previous one ended.
+    init_pose_model(_DEVICE)
+
+    T = len(frames)
+    out = np.zeros((T, 17, 3), dtype=np.float32)
+    confs: list[float] = []
+    full_body_flags: list[bool] = []
+
+    step_ms = 1000.0 / fps if fps > 0 else 33.0
+
+    for t, frame in enumerate(frames):
+        h, w = frame.shape[:2]
+        # decode.py already produces RGB, which is what MediaPipe wants.
+        try:
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
+            # detect_for_video requires strictly increasing timestamps.
+            result = _MP_POSE.detect_for_video(mp_image, int(t * step_ms))
+        except Exception:
+            result = None
+
+        landmark_sets = getattr(result, "pose_landmarks", None) if result else None
+        if not landmark_sets:
+            confs.append(0.0)
+            full_body_flags.append(False)
+            continue
+
+        lms = landmark_sets[0]
+        for coco_idx, mp_idx in enumerate(MP_TO_COCO):
+            if mp_idx >= len(lms):
+                continue
+            lm = lms[mp_idx]
+            out[t, coco_idx, 0] = lm.x * w
+            out[t, coco_idx, 1] = lm.y * h
+            # `visibility` is MediaPipe's own estimate that the joint was
+            # genuinely observed rather than inferred behind an occlusion —
+            # exactly the signal posture.py's occlusion gate needs.
+            out[t, coco_idx, 2] = float(getattr(lm, "visibility", 0.0))
+
+        confs.append(float(out[t, :, 2].mean()))
+        full_body_flags.append(_full_body(out[t, :, :2], out[t, :, 2], w, h))
+
+    mean_conf = float(np.mean(confs)) if confs else 0.0
+    return PoseSequence(
+        keypoints=out,
+        # mp.solutions.Pose is single-person by design, so a second golfer
+        # in frame cannot be detected here — unlike the RTMPose path, which
+        # ran a multi-person detector. Reported as False rather than
+        # guessed; the `multiple_people` warning simply never fires on this
+        # backend.
+        multiple_people=False,
+        pose_confidence_mean=mean_conf,
+        full_body_in_frame=bool(np.mean(full_body_flags) > 0.7)
+        if full_body_flags
+        else False,
+    )
+
+
+def _run_rtmpose(frames: list[np.ndarray]) -> PoseSequence:
     global _BODY
     if _BODY is None:
         init_pose_model(_DEVICE)
@@ -99,7 +253,6 @@ def run_pose(frames: list[np.ndarray]) -> PoseSequence:
             keypoints = keypoints[None, ...]
             scores = scores[None, ...]
 
-        # Truncate / pad to 17 joints if model returns body7 variants
         if keypoints.shape[1] > 17:
             keypoints = keypoints[:, :17, :]
             scores = scores[:, :17]
@@ -111,8 +264,7 @@ def run_pose(frames: list[np.ndarray]) -> PoseSequence:
             pad_s[:, :n] = scores
             keypoints, scores = pad_k, pad_s
 
-        n = len(keypoints)
-        if n > 1:
+        if len(keypoints) > 1:
             multiple = True
 
         idx = _largest_person(keypoints, scores)
@@ -137,3 +289,9 @@ def run_pose(frames: list[np.ndarray]) -> PoseSequence:
         if full_body_flags
         else False,
     )
+
+
+def run_pose(frames: list[np.ndarray], fps: float = 30.0) -> PoseSequence:
+    if _backend() == "rtmpose":
+        return _run_rtmpose(frames)
+    return _run_mediapipe(frames, fps)
