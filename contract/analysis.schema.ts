@@ -120,6 +120,33 @@ export const Fault = z.object({
 });
 export type Fault = z.infer<typeof Fault>;
 
+/**
+ * Reliability-gated limb angle at one swing event.
+ *
+ * `scorable` is the pipeline's verdict that this number is solid enough to
+ * GRADE, which is a higher bar than being solid enough to display: it
+ * requires the joint to have been genuinely observed rather than inferred
+ * behind an occlusion, and requires the frames around the event to agree
+ * with each other. See inference/pipeline/posture.py.
+ */
+export const LimbMeasurement = z.object({
+  limb: z.enum(["arm", "leg"]),
+  side: z.enum(["left", "right"]),
+  /** Determined per-swing from the backswing fold, never assumed from handedness. */
+  role: z.enum(["trail", "lead"]).nullable(),
+  event: SwingEvent,
+  frame: z.number().int(),
+  valueDeg: z.number(),
+  confidence: z.number().min(0).max(1),
+  /** Degrees of disagreement between frames around the event. */
+  spreadDeg: z.number(),
+  scorable: z.boolean(),
+  notScorableReason: z
+    .enum(["joint_occluded", "unstable_tracking", "role_undetermined"])
+    .nullable(),
+});
+export type LimbMeasurement = z.infer<typeof LimbMeasurement>;
+
 export const AnalysisResult = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
   swingId: z.string().uuid(),
@@ -129,6 +156,8 @@ export const AnalysisResult = z.object({
   quality: QualityInfo,
   events: z.array(DetectedEvent),
   metrics: z.array(Metric),
+  /** Optional so older payloads still validate. */
+  limbs: z.array(LimbMeasurement).default([]),
   faults: z.array(Fault),
   /** Blob URL to gzipped keypoint JSON — never inline */
   keypointsUrl: z.string().url().nullable(),

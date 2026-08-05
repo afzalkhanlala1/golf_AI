@@ -12,6 +12,7 @@ from pipeline.decode import DecodeError, decode_video, download_video
 from pipeline.events import detect_events, has_swing_motion
 from pipeline.metrics import compute_metrics
 from pipeline.pose import run_pose
+from pipeline.posture import compute_limb_measurements
 from pipeline.view import classify_view
 
 
@@ -83,6 +84,7 @@ def _rejected(
         },
         "events": [],
         "metrics": [],
+        "limbs": [],
         "faults": [],
         "keypointsUrl": None,
     }
@@ -175,6 +177,8 @@ def analyze_swing(
         pose.keypoints, events, clip.fps, pose.pose_confidence_mean
     )
 
+    limbs = compute_limb_measurements(pose.keypoints, events)
+
     if clip.fps < PREFERRED_MIN_FPS:
         for e in events:
             phase = "impact" if e["event"] == "impact" else "full"
@@ -218,6 +222,9 @@ def analyze_swing(
         },
         "events": events,
         "metrics": metrics,
+        # Reliability-gated limb angles; the literature bands and score that
+        # consume these live in TypeScript (SPEC 7.1).
+        "limbs": limbs,
         "faults": [],  # TypeScript detectFaults owns faults
         "keypointsUrl": keypoints_url,
     }

@@ -213,6 +213,101 @@
             "additionalProperties": false
           }
         },
+        "limbs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "limb": {
+                "type": "string",
+                "enum": [
+                  "arm",
+                  "leg"
+                ]
+              },
+              "side": {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              "role": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "trail",
+                      "lead"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "event": {
+                "type": "string",
+                "enum": [
+                  "address",
+                  "toe_up",
+                  "mid_backswing",
+                  "top",
+                  "mid_downswing",
+                  "impact",
+                  "mid_follow_through",
+                  "finish"
+                ]
+              },
+              "frame": {
+                "type": "integer"
+              },
+              "valueDeg": {
+                "type": "number"
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "spreadDeg": {
+                "type": "number"
+              },
+              "scorable": {
+                "type": "boolean"
+              },
+              "notScorableReason": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "joint_occluded",
+                      "unstable_tracking",
+                      "role_undetermined"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "limb",
+              "side",
+              "role",
+              "event",
+              "frame",
+              "valueDeg",
+              "confidence",
+              "spreadDeg",
+              "scorable",
+              "notScorableReason"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
         "faults": {
           "type": "array",
           "items": {

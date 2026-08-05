@@ -7,6 +7,7 @@ const links = [
   { href: "/swings", label: "Swings" },
   { href: "/progress", label: "Dashboard" },
   { href: "/lab/segmentation", label: "Lab" },
+  { href: "/lab/preprocess", label: "Conditioning" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

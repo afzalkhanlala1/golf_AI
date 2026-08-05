@@ -85,6 +85,7 @@ def _failure_payload(swing_id: str, view: str, message: str) -> dict:
         },
         "events": [],
         "metrics": [],
+        "limbs": [],
         "faults": [],
         "keypointsUrl": None,
     }

@@ -57,6 +57,48 @@ function events(fps: number, reducedFps = false): AnalysisResult["events"] {
   );
 }
 
+/**
+ * Reliability-gated limb angles. The "bad" variant deliberately includes an
+ * occluded lead arm so the UI's not-scorable path is exercised by a demo —
+ * that path is easy to break silently otherwise.
+ */
+function limbs(
+  good: boolean,
+  reducedFps: boolean,
+): AnalysisResult["limbs"] {
+  const conf = reducedFps ? 0.55 : 0.88;
+  const rows: AnalysisResult["limbs"] = [
+    {
+      limb: "arm", side: "right", role: "trail", event: "top", frame: 240,
+      valueDeg: good ? 96 : 142, confidence: conf, spreadDeg: 4.2,
+      scorable: !reducedFps, notScorableReason: reducedFps ? "joint_occluded" : null,
+    },
+    {
+      limb: "arm", side: "left", role: "lead", event: "top", frame: 240,
+      valueDeg: good ? 168 : 138, confidence: 0.52, spreadDeg: 6.1,
+      // Lead arm hidden behind the body from this angle — measured but
+      // never graded.
+      scorable: false, notScorableReason: "joint_occluded",
+    },
+    {
+      limb: "leg", side: "left", role: "lead", event: "top", frame: 240,
+      valueDeg: good ? 148 : 128, confidence: conf, spreadDeg: 3.4,
+      scorable: !reducedFps, notScorableReason: reducedFps ? "joint_occluded" : null,
+    },
+    {
+      limb: "leg", side: "left", role: "lead", event: "impact", frame: 340,
+      valueDeg: good ? 165 : 122, confidence: conf, spreadDeg: 5.0,
+      scorable: !reducedFps, notScorableReason: reducedFps ? "joint_occluded" : null,
+    },
+    {
+      limb: "arm", side: "left", role: "lead", event: "impact", frame: 340,
+      valueDeg: good ? 158 : 131, confidence: conf, spreadDeg: 7.7,
+      scorable: !reducedFps, notScorableReason: reducedFps ? "joint_occluded" : null,
+    },
+  ];
+  return rows;
+}
+
 export function buildMockAnalysis(
   swingId: string,
   variant: MockVariant = "early_extension",
@@ -84,6 +126,7 @@ export function buildMockAnalysis(
       },
       events: [],
       metrics: [],
+      limbs: [],
       faults: [],
       keypointsUrl: null,
     };
@@ -163,6 +206,7 @@ export function buildMockAnalysis(
     },
     events: events(fps, reducedFps),
     metrics,
+    limbs: limbs(good, reducedFps),
     faults,
     // Keypoints stay on blob in real inference; mock returns null (UI still works).
     keypointsUrl: null,
