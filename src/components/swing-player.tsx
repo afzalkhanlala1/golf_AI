@@ -16,20 +16,85 @@ import {
 
 type EventRow = { event: string; frame: number; timestampMs: number };
 
+type TracerPoint = { f: number; x: number; y: number; c: number };
+
 type KeypointPayload = {
   fps: number;
   width: number;
   height: number;
   frames: number[][][];
+  /** Clubhead path in image pixels. Null when the clip could not support one. */
+  tracer: TracerPoint[] | null;
 };
 
 const SPEEDS = [0.25, 0.5, 1] as const;
+
+/** Cool at the top of the swing, hot through impact. */
+const TRACER_COLD = [90, 190, 255] as const;
+const TRACER_HOT = [255, 170, 40] as const;
 
 /** Regions carrying a detected fault are drawn in the fault colour. */
 const FAULT_COLOR = "#e0503a";
 const BONE_COLOR = "#ffffff";
 const OUTLINE = "rgba(0,0,0,0.55)";
 const BRACKET = "#f0a020";
+
+/**
+ * Draw the clubhead path.
+ *
+ * The whole arc is laid down faintly so the shape of the swing plane is
+ * readable in a paused frame, then the part already played is drawn hot on
+ * top. That way scrubbing shows *where in the arc* the club is, which a
+ * single static polyline cannot.
+ */
+function drawTracer(
+  ctx: CanvasRenderingContext2D,
+  tracer: TracerPoint[],
+  index: number,
+  unit: number,
+) {
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.beginPath();
+  ctx.moveTo(tracer[0]!.x, tracer[0]!.y);
+  for (const p of tracer) ctx.lineTo(p.x, p.y);
+  ctx.strokeStyle = "rgba(255,255,255,0.16)";
+  ctx.lineWidth = 2 * unit;
+  ctx.stroke();
+
+  const played = tracer.filter((p) => p.f <= index);
+  if (played.length > 1) {
+    for (let i = 1; i < played.length; i++) {
+      const a = played[i - 1]!;
+      const b = played[i]!;
+      const t = i / (played.length - 1);
+      const col = TRACER_COLD.map((c, k) =>
+        Math.round(c + (TRACER_HOT[k]! - c) * t),
+      );
+      // Interpolated points carry a reduced confidence from the tracker;
+      // letting that through as opacity keeps a guessed segment from
+      // looking as certain as a measured one.
+      ctx.globalAlpha = 0.35 + 0.65 * Math.min(1, b.c * 1.4);
+      ctx.strokeStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+      ctx.lineWidth = (1.5 + 2.5 * t) * unit;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    const head = played[played.length - 1]!;
+    ctx.beginPath();
+    ctx.arc(head.x, head.y, 4 * unit, 0, Math.PI * 2);
+    ctx.fillStyle = `rgb(${TRACER_HOT[0]},${TRACER_HOT[1]},${TRACER_HOT[2]})`;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.5)";
+    ctx.lineWidth = 1.5 * unit;
+    ctx.stroke();
+  }
+}
 
 export function SwingPlayer({
   swingId,
@@ -52,6 +117,8 @@ export function SwingPlayer({
   const [frameIndex, setFrameIndex] = useState(0);
   const [speed, setSpeed] = useState<number>(0.5);
   const [showSkeleton, setShowSkeleton] = useState(true);
+  const [tracer, setTracer] = useState<TracerPoint[] | null>(null);
+  const [showTracer, setShowTracer] = useState(true);
   const [unavailable, setUnavailable] = useState<string | null>(null);
 
   const faults = useMemo(() => new Set(faultRegions), [faultRegions]);
@@ -70,6 +137,7 @@ export function SwingPlayer({
           p.frames.map((f) => f.map(([x, y, c]) => ({ x: x ?? 0, y: y ?? 0, c: c ?? 0 }))),
         );
         setMeta({ fps: p.fps, width: p.width, height: p.height });
+        setTracer(p.tracer ?? null);
       })
       .catch((e: unknown) => {
         if (!cancelled) {
@@ -97,14 +165,22 @@ export function SwingPlayer({
         canvas.height = meta.height;
       }
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (!showSkeleton) return;
-
-      const frame = frames[Math.max(0, Math.min(index, frames.length - 1))];
-      if (!frame) return;
 
       // Scale line weights off the clip's own size so the overlay looks the
       // same on a 480px portrait clip and a 1080p one.
       const unit = Math.max(meta.width, meta.height) / 480;
+
+      // Tracer under the skeleton: the club passes behind the body through
+      // most of the downswing, and drawing it on top would read as if it
+      // were in front.
+      if (showTracer && tracer && tracer.length > 1) {
+        drawTracer(ctx, tracer, index, unit);
+      }
+
+      if (!showSkeleton) return;
+
+      const frame = frames[Math.max(0, Math.min(index, frames.length - 1))];
+      if (!frame) return;
 
       const box = trackingBox(frame, meta.width, meta.height);
       if (box) {
@@ -206,7 +282,7 @@ export function SwingPlayer({
         ctx.fillText(label, meta.width / 2, by + bh / 2);
       }
     },
-    [frames, meta, events, faults, showSkeleton],
+    [frames, meta, events, faults, showSkeleton, showTracer, tracer],
   );
 
   useEffect(() => {
@@ -313,6 +389,16 @@ export function SwingPlayer({
               />
               Skeleton
             </label>
+            {tracer && tracer.length > 1 && (
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={showTracer}
+                  onChange={(e) => setShowTracer(e.target.checked)}
+                />
+                Tracer
+              </label>
+            )}
           </div>
 
           {faultRegions.length > 0 && (

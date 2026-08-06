@@ -8,7 +8,9 @@ import {
   swingMetrics,
   swingScores,
   swings,
+  users,
 } from "@/lib/db/schema";
+import { normalizeLocale } from "@/lib/i18n/locales";
 import { detectFaults } from "@/lib/scoring/faults";
 import { scoreAnalysis } from "@/lib/scoring/score";
 import { generateFeedback } from "@/lib/feedback/generate";
@@ -52,8 +54,20 @@ export async function persistAnalysisResult(raw: AnalysisResult) {
     qualityWarnings: parsed.quality.warnings,
   };
 
-  const { feedback: fb, model, promptVersion } =
-    await generateFeedback(findings);
+  // Coaching is written in the golfer's language, so it has to be looked up
+  // from the swing's owner — this runs in a callback from the inference
+  // service, where there is no request session to read it from.
+  const [owner] = await db
+    .select({ locale: users.locale })
+    .from(users)
+    .innerJoin(swings, eq(swings.userId, users.id))
+    .where(eq(swings.id, parsed.swingId))
+    .limit(1);
+
+  const { feedback: fb, model, promptVersion } = await generateFeedback(
+    findings,
+    normalizeLocale(owner?.locale),
+  );
 
   await db
     .update(swings)
@@ -65,6 +79,7 @@ export async function persistAnalysisResult(raw: AnalysisResult) {
       frameCount: parsed.capture.frameCount,
       qualityWarnings: parsed.quality.warnings,
       keypointsUrl: parsed.keypointsUrl,
+      clubTracking: parsed.club,
       analyzedAt: new Date(),
       view: parsed.capture.view,
     })

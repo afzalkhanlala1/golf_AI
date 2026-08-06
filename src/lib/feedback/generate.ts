@@ -1,9 +1,10 @@
 import OpenAI from "openai";
 import { z } from "zod";
 import { getEnv } from "@/lib/env";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n/locales";
 import {
   PROMPT_VERSION,
-  SYSTEM_PROMPT,
+  buildSystemPrompt,
   type FindingsPayload,
 } from "./prompt";
 import { validateGrounding } from "./validate";
@@ -76,6 +77,7 @@ function templateFeedback(findings: FindingsPayload): FeedbackOutput {
 
 async function callOpenRouter(
   findings: FindingsPayload,
+  locale: Locale,
   violationNote?: string,
 ): Promise<string> {
   const env = getEnv();
@@ -89,7 +91,7 @@ async function callOpenRouter(
     temperature: 0.3,
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: buildSystemPrompt(locale) },
       {
         role: "user",
         content: JSON.stringify({
@@ -111,7 +113,10 @@ async function callOpenRouter(
   return completion.choices[0]?.message?.content ?? "{}";
 }
 
-export async function generateFeedback(findings: FindingsPayload): Promise<{
+export async function generateFeedback(
+  findings: FindingsPayload,
+  locale: Locale = DEFAULT_LOCALE,
+): Promise<{
   feedback: FeedbackOutput;
   model: string;
   promptVersion: string;
@@ -124,7 +129,7 @@ export async function generateFeedback(findings: FindingsPayload): Promise<{
   while (attempt < 2) {
     attempt += 1;
     try {
-      const raw = await callOpenRouter(findings, violationNote);
+      const raw = await callOpenRouter(findings, locale, violationNote);
       const parsed = FeedbackSchema.parse(JSON.parse(raw));
 
       if (

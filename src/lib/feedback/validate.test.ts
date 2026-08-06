@@ -44,13 +44,10 @@ describe("validateGrounding", () => {
     expect(v.some((x) => x.includes("Ungrounded number: 47"))).toBe(true);
   });
 
-  it("rejects banned clubhead / ball flight terms", () => {
+  it("rejects ball-flight terms this pipeline never measures", () => {
     const cases = [
-      "Your clubhead speed looks great",
-      "ball speed is up",
       "spin rate improved",
       "launch angle is perfect",
-      "smash factor of dreams",
       "carry distance exploded",
     ];
     for (const text of cases) {
@@ -58,6 +55,43 @@ describe("validateGrounding", () => {
         true,
       );
     }
+  });
+
+  it("rejects club-delivery terms when that metric was not measured", () => {
+    // These are real measurements now, but only on a face-on clip at 60fps+.
+    // On this swing they are absent, so talking about them is invention.
+    const cases = [
+      "Your clubhead speed looks great",
+      "ball speed is up",
+      "smash factor of dreams",
+      "attack angle is shallow",
+    ];
+    for (const text of cases) {
+      expect(
+        validateGrounding(text, findings).some((x) =>
+          x.includes("was not measured"),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it("allows a club-delivery term once that metric is present", () => {
+    const measured: FindingsPayload = {
+      ...findings,
+      metrics: [
+        ...findings.metrics,
+        { key: "clubhead_speed_mph", value: 98, unit: "mph", target: null },
+      ],
+    };
+    expect(validateGrounding("Clubhead speed of 98 is strong.", measured)).toEqual(
+      [],
+    );
+    // ...and the ones still unmeasured stay blocked in the same breath.
+    expect(
+      validateGrounding("ball speed is up", measured).some((x) =>
+        x.includes("was not measured"),
+      ),
+    ).toBe(true);
   });
 
   it("rejects wrist / force-plate / medical claims", () => {

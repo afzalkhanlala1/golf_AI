@@ -109,7 +109,15 @@ let landmarkerPromise: Promise<{
   close: () => void;
 }> | null = null;
 
-async function getLandmarker() {
+/**
+ * Shared across the upload extractor and the live webcam coach.
+ *
+ * Deliberately one instance: the wasm runtime plus model is several
+ * megabytes and a second copy would double both the download and the GPU
+ * footprint. `runningMode: "VIDEO"` suits both — a webcam is just a video
+ * element whose frames happen to arrive live.
+ */
+export async function getLandmarker() {
   if (!landmarkerPromise) {
     landmarkerPromise = (async () => {
       const { FilesetResolver, PoseLandmarker } = await import(

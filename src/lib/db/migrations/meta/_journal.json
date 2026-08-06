@@ -8,6 +8,13 @@
       "when": 1785432931074,
       "tag": "0000_overconfident_wendigo",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786032076441,
+      "tag": "0001_huge_bushwacker",
+      "breakpoints": true
     }
   ]
 }

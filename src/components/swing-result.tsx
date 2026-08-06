@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { SwingPlayer } from "@/components/swing-player";
 import { SwingPlayer3D } from "@/components/swing-player-3d";
+import { ClubDeliveryCard } from "@/components/club-delivery-card";
 
 /**
  * Which body region each TPI fault should light up in the overlay, so a
@@ -34,6 +35,12 @@ type SwingPayload = {
     club: string | null;
     view: string;
     fps: number | null;
+    clubTracking: {
+      tracked: boolean;
+      scalePxPerM: number | null;
+      speedUnavailableReason: string | null;
+      ballUnavailableReason: string | null;
+    } | null;
   };
   events: Array<{
     event: string;
@@ -287,6 +294,11 @@ export function SwingResult({ id }: { id: string }) {
         </div>
 
         <div className="space-y-6">
+          <ClubDeliveryCard
+            metrics={metrics}
+            clubTracking={swing.clubTracking ?? null}
+          />
+
           <div>
             <p className="text-sm uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">
               Swing score

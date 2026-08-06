@@ -24,6 +24,51 @@ const STEPS = [
   },
 ];
 
+/**
+ * Each of these says what it measures AND what it needs to do it. The
+ * capture requirements are not fine print — a golfer who films 30fps
+ * down-the-line and then finds half the product greyed out was misled, and
+ * the honest fix is to say so before they film, not after.
+ */
+const FEATURES = [
+  {
+    title: "3D skeleton playback",
+    body: "Orbit your swing in three dimensions from a metric body reconstruction. Face-on, down-the-line, overhead — angles no single camera filmed.",
+    needs: "Any clip",
+    href: "/swings",
+  },
+  {
+    title: "Ghost comparison",
+    body: "Overlay any two of your swings. Both are scaled to the same torso length and lined up on their shared events, so you compare shape and timing rather than height and clip length.",
+    needs: "Two analysed swings",
+    href: "/swings",
+  },
+  {
+    title: "Clubhead & ball speed",
+    body: "The clubhead is tracked through the strike and converted to real units using your own body as the ruler. Smash factor and attack angle come with it.",
+    needs: "Face-on, 60fps+ (ball speed 120fps+)",
+    href: "/upload",
+  },
+  {
+    title: "Swing tracer",
+    body: "The clubhead path drawn on your video, cool at the top and hot through impact, so the shape of your plane is readable in a single frame.",
+    needs: "60fps+",
+    href: "/upload",
+  },
+  {
+    title: "Live Coach",
+    body: "Real-time setup coaching from your webcam — posture, knee flex, stance width, balance. Runs entirely in your browser; no video is uploaded or recorded.",
+    needs: "A camera",
+    href: "/coach",
+  },
+  {
+    title: "Equipment fitting",
+    body: "Shaft flex, driver loft, club length, iron head and ball, each built from your measured swing and your own measurements — and each labelled with what it was derived from.",
+    needs: "Your height and handicap",
+    href: "/fitting",
+  },
+];
+
 const TRUST_CARDS = [
   {
     title: "Attribution, not just a number",
@@ -162,6 +207,35 @@ export default function MarketingHomePage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-6 py-20">
+        <p className="text-sm font-medium tracking-[0.22em] text-[color:var(--sand)] uppercase">
+          What you get
+        </p>
+        <h2 className="mt-3 max-w-xl font-[family-name:var(--font-display)] text-3xl text-[color:var(--fairway)] sm:text-4xl">
+          Six things, and what each one needs from your camera.
+        </h2>
+
+        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map((f) => (
+            <Link
+              key={f.title}
+              href={f.href}
+              className="group flex flex-col rounded-2xl border border-[color:var(--line)] bg-white/70 p-6 transition hover:border-[color:var(--fairway-soft)] hover:bg-white"
+            >
+              <h3 className="font-[family-name:var(--font-display)] text-xl text-[color:var(--fairway)]">
+                {f.title}
+              </h3>
+              <p className="mt-2 flex-1 text-[15px] leading-relaxed text-[color:var(--ink-muted)]">
+                {f.body}
+              </p>
+              <p className="mt-4 text-xs tracking-wide text-[color:var(--sand)] uppercase">
+                Needs: {f.needs}
+              </p>
+            </Link>
+          ))}
         </div>
       </section>
 

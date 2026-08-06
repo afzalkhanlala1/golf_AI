@@ -6,6 +6,8 @@ import { isAuthDisabled } from "@/lib/auth-mode";
 const links = [
   { href: "/upload", label: "Upload" },
   { href: "/swings", label: "Swings" },
+  { href: "/coach", label: "Live Coach" },
+  { href: "/fitting", label: "Fitting" },
   { href: "/progress", label: "Dashboard" },
   { href: "/lab/segmentation", label: "Lab" },
   { href: "/lab/preprocess", label: "Conditioning" },

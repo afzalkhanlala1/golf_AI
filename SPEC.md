@@ -427,15 +427,151 @@ Every one of `QUEUED / PROCESSING / FAILED / REJECTED` needs a designed state. `
 
 ---
 
+## 14. Club delivery, 3D playback, fitting and Live Coach
+
+### 14.1 The governing rule: withhold rather than approximate
+
+Everything in this section is measured from one consumer camera. A single
+camera cannot see motion along its own optical axis, and it cannot sample
+faster than it records. Where those limits bite, the pipeline emits **no
+number and a reason**, never a degraded one.
+
+That distinction matters and is not a confidence question. A down-the-line
+clubhead speed is not noisy — it is *biased*, by a factor of two or three,
+and no confidence score repairs a bias. Same for frame rate: at 30fps a
+100mph clubhead travels ~1.5m between exposures, further than the club is
+long, so there is nothing to track rather than something to track poorly.
+
+Hard gates, enforced in `inference/pipeline/club.py`:
+
+| Output | Requires |
+| --- | --- |
+| Swing tracer | ≥60fps |
+| Clubhead speed, attack angle | ≥60fps **and** face-on |
+| Ball speed, smash factor | ≥120fps **and** face-on |
+| 3D playback, ghost | nothing extra — works at 30fps |
+| Club path (in-to-out) | **not emitted at all** — see below |
+
+3D playback needs no high frame rate because world landmarks come from the
+pose model on each frame independently; there is no inter-frame tracking to
+break down.
+
+**Club path is deliberately absent.** It is an angle relative to the target
+line. Face-on, the target line runs along the camera axis, where there is no
+signal. This is a monocular limit, not a tuning problem, and it should not be
+added without a second camera.
+
+### 14.2 Scale — `inference/pipeline/scale.py`
+
+Pixels-to-metres from MediaPipe's metric reconstruction: body segment lengths
+in pixels against **their projection into the world x/y plane**. Dropping the
+world z component is what makes it correct — comparing against full 3D length
+inflates the scale for any segment angled toward the camera.
+
+### 14.3 Club tracking — `inference/pipeline/club.py`
+
+Three-frame differencing (cancels the trailing motion ghost), torso
+suppression, a club-length annulus around the hands, then a second pass
+against a tight band around the radius the first pass actually observed.
+Ball speed uses a small RANSAC over post-impact blobs, because the clubhead
+is still moving fast beside the ball and passes every size and distance
+filter — what it cannot do is stay on the ball's straight line.
+
+**Two independent accept/reject layers**, and both are load-bearing:
+
+1. The frame-rate and view gates above.
+2. A physical check on the track: rigidity (a clubhead holds a fixed distance
+   from the hands) **and** reach in metres against what is actually in a golf
+   bag. Rigidity alone is insufficient — on real footage a track locked onto
+   a forearm held a beautifully consistent 0.62m radius and passed. The reach
+   test uses the 90th percentile so a foreshortened down-the-line club is not
+   penalised for it.
+
+### 14.4 3D playback — `src/lib/three-d/skeleton3d.ts`
+
+Ghost comparison removes three mismatches, each measured **once at address
+and applied to every frame**:
+
+- **Size** — divide by torso length. Per-frame would pump the skeleton larger
+  and smaller as the torso foreshortens through the turn.
+- **Facing** — rotate the stance to a canonical bearing. Per-frame would
+  square the body up on every frame and *erase the shoulder turn*, which is
+  the thing a golfer opens 3D to see. A test pins >60° of turn surviving.
+- **Timing** — piecewise-linear warp through shared events, so address sits
+  on address and impact on impact at any tempo.
+
+### 14.5 Live Coach — `/coach`
+
+Real-time **setup** coaching from the webcam: spine angle, knee flex, stance
+width, head position. Runs entirely client-side via `@mediapipe/tasks-vision`;
+no frame leaves the browser and nothing is recorded.
+
+It does not analyse swings, and the UI says so. A webcam is ~30fps and a
+downswing is ~7 frames — live swing numbers would be invented. Address
+position is the opposite case: held still, most reliable for the pose model,
+and where the cheapest improvements live.
+
+### 14.6 Fitting — `src/lib/fitting/engine.ts`, `/fitting`
+
+Shaft flex, driver loft, club length, iron category and ball, each carrying
+`confidence: measured | estimated` and the inputs it came from. Clubhead
+speed is the median of up to five recent measured swings — not the latest
+(rides on one clip) and not the max (systematically over-fits, putting a
+golfer in a shaft too stiff for their Tuesday swing).
+
+It degrades by design: length and iron category need no speed at all, so a
+30fps down-the-line golfer still gets real recommendations plus a specific
+list of what to change to unlock the rest.
+
+### 14.7 Coaching language
+
+Coaching is generated **in the golfer's language at generation time**, not
+translated afterwards — swing instruction is idiomatic and machine-translated
+English reads like a manual. `users.locale` drives it; UI chrome remains
+English, and the picker is labelled "Coaching language" so it does not
+promise otherwise.
+
+`validateGrounding` gates club-delivery vocabulary on the metric being
+present: the coach may say "clubhead speed" only on a swing where clubhead
+speed was measured.
+
+---
+
 ## 10. Explicitly out of scope
 
 Do not build these. Do not stub them "for later" in a way that adds dependencies.
 
 - **Model training or fine-tuning.** Use pretrained weights only. Expose `SWINGNET_CHECKPOINT_URL` as an env var so a checkpoint trained elsewhere can be dropped in without a code change.
-- In-browser video recording (§2.4).
-- 3D pose, SMPL meshes, or avatar reconstruction. Sportsbox holds granted US patents in this area (see US 11,640,725) — a 2D metrics product sits well outside those claims and that is deliberate.
-- Club or clubhead tracking.
+- In-browser video *recording* of swings (§2.4). Note the Live Coach (§14.5) reads a live camera without recording or uploading anything — that is a different thing and is in scope.
+- SMPL meshes and avatar reconstruction.
 - Native mobile apps.
+- A coach-facing multi-student dashboard.
+- Real payment processing beyond Stripe test mode.
+
+### Scope changes — 3D pose and club tracking
+
+Two items moved **out of this list and into the product** (§14), by explicit
+product decision:
+
+- **3D pose playback** (was: "3D pose, SMPL meshes, or avatar reconstruction")
+- **Club and clubhead tracking** (was: "Club or clubhead tracking")
+
+⚠️ **The original exclusion of 3D pose carried a patent rationale, preserved
+here verbatim so the decision is not lost:**
+
+> *3D pose, SMPL meshes, or avatar reconstruction. Sportsbox holds granted US
+> patents in this area (see US 11,640,725) — a 2D metrics product sits well
+> outside those claims and that is deliberate.*
+
+What is now built is skeletal 3D playback from MediaPipe's `pose_world_landmarks`
+— joint positions in metres, rendered as a stick figure. No mesh, no avatar,
+no SMPL. That is a narrower thing than what the original note excluded, but
+it is not the 2D-only posture the note was written to protect. **This is a
+question for counsel, not for this document.** Nobody on the engineering side
+has assessed the claims of US 11,640,725 against what was built.
+
+The club-tracking exclusion carried no stated rationale and reads as a scope
+decision rather than a legal one.
 - A coach-facing multi-student dashboard.
 - Real payment processing beyond Stripe test mode.
 

@@ -29,6 +29,16 @@ export const users = pgTable("users", {
   email: text("email").notNull(),
   handicap: real("handicap"),
   heightCm: real("height_cm"),
+  /**
+   * Fingertip-to-floor, standing straight. The measurement club fitters
+   * actually use for shaft length — height alone gets it wrong for anyone
+   * whose arm length is not average for their height, which is most of the
+   * people who need a fitting in the first place. Optional: the engine
+   * falls back to height and says that it did.
+   */
+  wristToFloorCm: real("wrist_to_floor_cm"),
+  /** BCP-47. Drives UI copy and the language coaching is written in. */
+  locale: text("locale").notNull().default("en"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -52,6 +62,18 @@ export const swings = pgTable(
     status: swingStatusEnum("status").notNull().default("QUEUED"),
     rejectionReason: text("rejection_reason"),
     qualityWarnings: jsonb("quality_warnings").$type<string[]>().default([]),
+    /**
+     * The pipeline's `club` block — whether the clubhead was tracked, the
+     * pixels-per-metre scale, and why speed or ball speed is absent when
+     * they are. Stored so the result page can tell the golfer "film face-on"
+     * instead of just showing a gap where a number should be.
+     */
+    clubTracking: jsonb("club_tracking").$type<{
+      tracked: boolean;
+      scalePxPerM: number | null;
+      speedUnavailableReason: string | null;
+      ballUnavailableReason: string | null;
+    } | null>(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
