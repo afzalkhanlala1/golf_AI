@@ -31,6 +31,23 @@ echo "==> account ${ACCOUNT}, region ${REGION}"
 # 1. ECR repository
 aws ecr describe-repositories --repository-names "$REPO" --region "$REGION" >/dev/null 2>&1 \
   || aws ecr create-repository --repository-name "$REPO" --region "$REGION" >/dev/null
+
+# A fresh ECR repo has no resource policy, and without one the Lambda
+# *service* — not the deploying user, a separate principal — cannot pull the
+# image at all: CreateFunction fails with "Lambda does not have permission
+# to access the ECR image." IAM permissions on the deploying user do not
+# cover this; it is a resource policy on the repository itself. Scoped to
+# this account only via the SourceAccount condition, not open to any caller.
+aws ecr set-repository-policy --repository-name "$REPO" --region "$REGION" --policy-text "{
+  \"Version\": \"2012-10-17\",
+  \"Statement\": [{
+    \"Sid\": \"LambdaECRImageRetrievalPolicy\",
+    \"Effect\": \"Allow\",
+    \"Principal\": { \"Service\": \"lambda.amazonaws.com\" },
+    \"Action\": [\"ecr:BatchGetImage\", \"ecr:GetDownloadUrlForLayer\"],
+    \"Condition\": { \"StringEquals\": { \"aws:SourceAccount\": \"${ACCOUNT}\" } }
+  }]
+}" >/dev/null
 echo "==> ecr repo ready: ${REPO}"
 
 # 2. Build and push. --provenance=false because Lambda rejects the extra
@@ -76,18 +93,19 @@ BLOB_TOKEN="$(read_env BLOB_READ_WRITE_TOKEN)"
 [ -n "$SHARED_SECRET" ] || { echo "error: INFERENCE_SHARED_SECRET missing from ${ENV_FILE}"; exit 1; }
 [ -n "$BLOB_TOKEN" ] || { echo "error: BLOB_READ_WRITE_TOKEN missing from ${ENV_FILE}"; exit 1; }
 
-ENV_JSON="$(python3 - "$SHARED_SECRET" "$BLOB_TOKEN" <<'PY'
-import json, sys
-print(json.dumps({"Variables": {
-    "INFERENCE_SHARED_SECRET": sys.argv[1],
-    "BLOB_READ_WRITE_TOKEN": sys.argv[2],
-    "POSE_BACKEND": "mediapipe",
-    "MEDIAPIPE_POSE_MODEL": "/var/task/models/pose_landmarker_full.task",
-    "HOME": "/tmp",
-    "XDG_CACHE_HOME": "/tmp",
-}}))
-PY
-)"
+# Built with bash rather than shelling out to python3: on Windows the bare
+# `python3`/`python` commands are frequently a Microsoft Store alias stub
+# that errors instead of running real Python (confirmed on this machine),
+# and this JSON is simple enough not to need a language dependency at all.
+json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+ENV_JSON="{\"Variables\":{\
+\"INFERENCE_SHARED_SECRET\":\"$(json_escape "$SHARED_SECRET")\",\
+\"BLOB_READ_WRITE_TOKEN\":\"$(json_escape "$BLOB_TOKEN")\",\
+\"POSE_BACKEND\":\"mediapipe\",\
+\"MEDIAPIPE_POSE_MODEL\":\"/var/task/models/pose_landmarker_full.task\",\
+\"HOME\":\"/tmp\",\
+\"XDG_CACHE_HOME\":\"/tmp\"\
+}}"
 
 # 5. Create or update
 if aws lambda get-function --function-name "$FUNCTION" --region "$REGION" >/dev/null 2>&1; then
@@ -106,14 +124,30 @@ fi
 aws lambda wait function-updated --function-name "$FUNCTION" --region "$REGION"
 
 # 6. Public Function URL. Auth is the shared secret the handler checks, which
-#    is the same posture the Modal deployment had.
+#    is the same posture the Modal deployment had. AWS requires TWO resource
+#    policies for AuthType=NONE: InvokeFunctionUrl (with auth-type condition)
+#    AND InvokeFunction for principal * — see urls-auth.html.
 if ! aws lambda get-function-url-config --function-name "$FUNCTION" --region "$REGION" >/dev/null 2>&1; then
   aws lambda create-function-url-config --function-name "$FUNCTION" \
     --auth-type NONE --region "$REGION" >/dev/null
-  aws lambda add-permission --function-name "$FUNCTION" \
-    --statement-id FunctionURLAllowPublicAccess --action lambda:InvokeFunctionUrl \
-    --principal '*' --function-url-auth-type NONE --region "$REGION" >/dev/null
 fi
+for sid_action in \
+  "FunctionURLAllowPublicAccess:lambda:InvokeFunctionUrl" \
+  "FunctionURLAllowPublicInvoke:lambda:InvokeFunction"; do
+  sid="${sid_action%%:*}"
+  action="${sid_action#*:}"
+  if [ "$action" = "lambda:InvokeFunctionUrl" ]; then
+    aws lambda add-permission --function-name "$FUNCTION" \
+      --statement-id "$sid" --action "$action" \
+      --principal '*' --function-url-auth-type NONE --region "$REGION" >/dev/null 2>&1 \
+      || true
+  else
+    aws lambda add-permission --function-name "$FUNCTION" \
+      --statement-id "$sid" --action "$action" \
+      --principal '*' --region "$REGION" >/dev/null 2>&1 \
+      || true
+  fi
+done
 URL="$(aws lambda get-function-url-config --function-name "$FUNCTION" --region "$REGION" --query FunctionUrl --output text)"
 
 echo

@@ -34,7 +34,9 @@
         "ecr:PutImage",
         "ecr:UploadLayerPart",
         "ecr:BatchGetImage",
-        "ecr:GetDownloadUrlForLayer"
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:SetRepositoryPolicy",
+        "ecr:GetRepositoryPolicy"
       ],
       "Resource": "arn:aws:ecr:REGION:ACCOUNT_ID:repository/golf-ai-inference"
     },
@@ -44,6 +46,7 @@
       "Action": [
         "lambda:CreateFunction",
         "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration",
         "lambda:UpdateFunctionCode",
         "lambda:UpdateFunctionConfiguration",
         "lambda:AddPermission",
