@@ -3,6 +3,18 @@ import { METRIC_TARGETS } from "@/lib/scoring/rubric.config";
 
 export type MockVariant = "good" | "early_extension" | "reduced_fps" | "low_fps";
 
+/**
+ * The unit heuristic below infers from the key name, which works for the
+ * body metrics but silently mislabels the club-delivery ones — "smash" has
+ * no "ratio" in it and "_mph" isn't a case it knows. Explicit wins.
+ */
+const EXPLICIT_UNITS: Record<string, AnalysisResult["metrics"][number]["unit"]> = {
+  clubhead_speed_mph: "mph",
+  ball_speed_mph: "mph",
+  smash_factor: "ratio",
+  attack_angle_deg: "deg",
+};
+
 function metric(
   key: string,
   value: number,
@@ -12,7 +24,9 @@ function metric(
   return {
     key,
     value,
-    unit: key.includes("ms")
+    unit:
+      EXPLICIT_UNITS[key] ??
+      (key.includes("ms")
       ? "ms"
       : key.includes("ratio") || key.includes("index")
         ? key.includes("index")
@@ -23,7 +37,7 @@ function metric(
             key.startsWith("head_") ||
             key.startsWith("weight_")
           ? "norm"
-          : "deg",
+          : "deg"),
     phase: cfg?.phase ?? "full",
     confidence,
     target: cfg ? { min: cfg.min, max: cfg.max } : null,
@@ -127,6 +141,12 @@ export function buildMockAnalysis(
       events: [],
       metrics: [],
       limbs: [],
+      club: {
+        tracked: false,
+        scalePxPerM: null,
+        speedUnavailableReason: "not_tracked",
+        ballUnavailableReason: "needs_clubhead_speed",
+      },
       faults: [],
       keypointsUrl: null,
     };
@@ -154,6 +174,18 @@ export function buildMockAnalysis(
     metric("kinematic_sequence_index", good ? 0.92 : 0.55),
     metric("shoulder_plane_top", good ? 45 : 38),
     metric("weight_forward_finish", good ? 0.72 : 0.58),
+    // Club delivery. At 30fps the real pipeline withholds these entirely
+    // rather than reporting a frame-rate-biased number, so the mock drops
+    // them too — otherwise the UI never gets exercised against the
+    // "measured, but not measurable here" state it has to handle.
+    ...(reducedFps
+      ? []
+      : [
+          metric("clubhead_speed_mph", good ? 98.4 : 84.1, 0.78),
+          metric("ball_speed_mph", good ? 145.2 : 118.6, 0.71),
+          metric("smash_factor", good ? 1.476 : 1.41, 0.71),
+          metric("attack_angle_deg", good ? -3.2 : -6.4, 0.55),
+        ]),
   ].map((m) =>
     reducedFps
       ? {
@@ -207,6 +239,12 @@ export function buildMockAnalysis(
     events: events(fps, reducedFps),
     metrics,
     limbs: limbs(good, reducedFps),
+    club: {
+      tracked: true,
+      scalePxPerM: 612.4,
+      speedUnavailableReason: reducedFps ? "needs_high_fps" : null,
+      ballUnavailableReason: reducedFps ? "needs_clubhead_speed" : null,
+    },
     faults,
     // Keypoints stay on blob in real inference; mock returns null (UI still works).
     keypointsUrl: null,

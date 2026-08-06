@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
+import logging
 import tempfile
 from pathlib import Path
 from typing import Any, Optional
 from uuid import UUID
 
 from pipeline.blob_io import keypoints_payload, upload_keypoints_gzip
+from pipeline.club import track_club
 from pipeline.decode import DecodeError, decode_video, download_video
 from pipeline.events import detect_events, has_swing_motion
 from pipeline.metrics import compute_metrics
 from pipeline.pose import run_pose
 from pipeline.posture import compute_limb_measurements
 from pipeline.view import classify_view
+
+logger = logging.getLogger(__name__)
 
 
 # Below this, pose tracking on a fast-moving clubhead/hands is too sparse to
@@ -191,6 +195,57 @@ def analyze_swing(
                 m["confidence"] * _fps_confidence_scale(clip.fps, m["phase"]), 3
             )
 
+    # Deliberately after the frame-rate damping above: club.py folds its own
+    # frame-rate term into these confidences, so running them through the
+    # generic damp as well would penalise the same weakness twice.
+    #
+    # Wrapped because this is the one stage doing open-ended computer vision
+    # on arbitrary footage. Everything above it — pose, events, metrics — is
+    # a complete, useful analysis on its own, and a tracking failure must
+    # not be able to take that away from the golfer.
+    club = None
+    club_failed = False
+    try:
+        club = track_club(
+            clip.frames,
+            pose.keypoints,
+            pose.world if pose.has_world() else None,
+            events,
+            clip.fps,
+            view,
+            clip.width,
+            clip.height,
+        )
+    except Exception:  # noqa: BLE001 - degrade, never fail the analysis
+        logger.exception("club tracking failed for swing %s", swing_id)
+        club_failed = True
+
+    if club is not None:
+        metrics.extend(club.metrics)
+
+    if club is not None:
+        club_block: Optional[dict[str, Any]] = {
+            "tracked": bool(club.tracked),
+            "scalePxPerM": club.scale_px_per_m,
+            "speedUnavailableReason": club.speed_unavailable_reason,
+            "ballUnavailableReason": club.ball_unavailable_reason,
+        }
+    elif club_failed:
+        club_block = {
+            "tracked": False,
+            "scalePxPerM": None,
+            "speedUnavailableReason": "tracking_failed",
+            "ballUnavailableReason": "needs_clubhead_speed",
+        }
+    else:
+        # track_club declined outright — no impact event to anchor to.
+        club_block = {
+            "tracked": False,
+            "scalePxPerM": None,
+            "speedUnavailableReason": "not_tracked",
+            "ballUnavailableReason": "needs_clubhead_speed",
+        }
+
     keypoints_url = None
     if upload_keypoints:
         payload = keypoints_payload(
@@ -199,6 +254,8 @@ def analyze_swing(
             width=clip.width,
             height=clip.height,
             swing_id=swing_id,
+            world=pose.world if pose.has_world() else None,
+            tracer=club.tracer if club else None,
         )
         keypoints_url = upload_keypoints_gzip(payload, swing_id=swing_id)
 
@@ -226,6 +283,10 @@ def analyze_swing(
         # Reliability-gated limb angles; the literature bands and score that
         # consume these live in TypeScript (SPEC 7.1).
         "limbs": limbs,
+        # Clubhead/ball tracking status. Separate from quality.warnings on
+        # purpose: "a single camera cannot see depth" is a statement about
+        # physics, not a defect in the golfer's video.
+        "club": club_block,
         "faults": [],  # TypeScript detectFaults owns faults
         "keypointsUrl": keypoints_url,
     }

@@ -33,6 +33,13 @@ TARGETS: dict[str, dict[str, float]] = {
     "kinematic_sequence_index": {"min": 0.7, "max": 1.0},
     "shoulder_plane_top": {"min": 35, "max": 55},
     "weight_forward_finish": {"min": 0.55, "max": 0.85},
+    # Deliberately no bands for the club-delivery metrics below. A "good"
+    # clubhead speed, ball speed, smash factor or attack angle is defined
+    # by the club in hand — a driver wants an ascending strike and ~1.48
+    # smash, a 7-iron wants a descending one and ~1.33 — and the pipeline
+    # is not told which club was swung. A single band would score most
+    # golfers against the wrong club, so these report a value and no target
+    # until the club is part of the analysis request.
 }
 
 PHASE: dict[str, str] = {
@@ -53,6 +60,10 @@ PHASE: dict[str, str] = {
     "kinematic_sequence_index": "downswing",
     "shoulder_plane_top": "top",
     "weight_forward_finish": "finish",
+    "clubhead_speed_mph": "impact",
+    "ball_speed_mph": "impact",
+    "smash_factor": "impact",
+    "attack_angle_deg": "impact",
 }
 
 UNIT: dict[str, str] = {
@@ -73,6 +84,10 @@ UNIT: dict[str, str] = {
     "kinematic_sequence_index": "index",
     "shoulder_plane_top": "deg",
     "weight_forward_finish": "norm",
+    "clubhead_speed_mph": "mph",
+    "ball_speed_mph": "mph",
+    "smash_factor": "ratio",
+    "attack_angle_deg": "deg",
 }
 
 
@@ -201,7 +216,7 @@ def _stance_w(kpts: np.ndarray, t: int) -> Optional[float]:
     return w if w > 1e-3 else None
 
 
-def _metric(key: str, value: float, confidence: float) -> dict[str, Any]:
+def make_metric(key: str, value: float, confidence: float) -> dict[str, Any]:
     tgt = TARGETS.get(key)
     return {
         "key": key,
@@ -307,29 +322,29 @@ def compute_metrics(
     back = top - address
     down = impact - top
     if down > 0:
-        out.append(_metric("tempo_ratio", back / down, conf))
-        out.append(_metric("backswing_duration_ms", (back / fps) * 1000.0, conf))
+        out.append(make_metric("tempo_ratio", back / down, conf))
+        out.append(make_metric("backswing_duration_ms", (back / fps) * 1000.0, conf))
 
     ls_a, rs_a = _xy(keypoints, address, L_SHOULDER), _xy(keypoints, address, R_SHOULDER)
     ls_t, rs_t = _xy(keypoints, top, L_SHOULDER), _xy(keypoints, top, R_SHOULDER)
     if all(p is not None for p in (ls_a, rs_a, ls_t, rs_t)):
         st = _line_rotation(ls_a, rs_a, ls_t, rs_t)  # type: ignore[arg-type]
-        out.append(_metric("shoulder_turn_top", st, conf))
+        out.append(make_metric("shoulder_turn_top", st, conf))
         plane = abs(_angle_delta(_inclination(ls_t, rs_t), 0.0))  # type: ignore[arg-type]
         if plane > 90.0:
             plane = 180.0 - plane
-        out.append(_metric("shoulder_plane_top", plane, conf))
+        out.append(make_metric("shoulder_plane_top", plane, conf))
 
     lh_a, rh_a = _xy(keypoints, address, L_HIP), _xy(keypoints, address, R_HIP)
     lh_t, rh_t = _xy(keypoints, top, L_HIP), _xy(keypoints, top, R_HIP)
     if all(p is not None for p in (lh_a, rh_a, lh_t, rh_t)):
         ht = _line_rotation(lh_a, rh_a, lh_t, rh_t)  # type: ignore[arg-type]
-        out.append(_metric("hip_turn_top", ht, conf))
+        out.append(make_metric("hip_turn_top", ht, conf))
 
     keys = {m["key"]: m["value"] for m in out}
     if "shoulder_turn_top" in keys and "hip_turn_top" in keys:
         out.append(
-            _metric(
+            make_metric(
                 "x_factor_top",
                 keys["shoulder_turn_top"] - keys["hip_turn_top"],
                 conf,
@@ -339,19 +354,19 @@ def compute_metrics(
     mh_a = _mid(lh_a, rh_a)
     ms_a = _mid(ls_a, rs_a)
     if mh_a is not None and ms_a is not None:
-        out.append(_metric("spine_angle_address", abs(_angle_from_vertical(mh_a, ms_a)), conf))
+        out.append(make_metric("spine_angle_address", abs(_angle_from_vertical(mh_a, ms_a)), conf))
 
     mh_i = _mid(_xy(keypoints, impact, L_HIP), _xy(keypoints, impact, R_HIP))
     ms_i = _mid(_xy(keypoints, impact, L_SHOULDER), _xy(keypoints, impact, R_SHOULDER))
     if mh_a is not None and ms_a is not None and mh_i is not None and ms_i is not None:
         a = abs(_angle_from_vertical(mh_a, ms_a))
         i = abs(_angle_from_vertical(mh_i, ms_i))
-        out.append(_metric("spine_angle_change", abs(i - a), conf))
+        out.append(make_metric("spine_angle_change", abs(i - a), conf))
 
     mh_t = _mid(lh_t, rh_t)
     ms_t = _mid(ls_t, rs_t)
     if mh_t is not None and ms_t is not None:
-        out.append(_metric("spine_tilt_top", _angle_from_vertical(mh_t, ms_t), conf * 0.9))
+        out.append(make_metric("spine_tilt_top", _angle_from_vertical(mh_t, ms_t), conf * 0.9))
 
     # Hip-normalised translations are only meaningful when the hip line is
     # actually resolved across the frame. From down-the-line the hips align
@@ -366,16 +381,16 @@ def compute_metrics(
 
     if hw and mh_a is not None and mh_i is not None:
         dy = mh_i[1] - mh_a[1]
-        out.append(_metric("hip_depth_change_downswing", max(0.0, dy / hw), conf))
+        out.append(make_metric("hip_depth_change_downswing", max(0.0, dy / hw), conf))
 
     if hw and mh_a is not None and mh_t is not None:
         out.append(
-            _metric("hip_lateral_backswing", abs(mh_t[0] - mh_a[0]) / hw, conf)
+            make_metric("hip_lateral_backswing", abs(mh_t[0] - mh_a[0]) / hw, conf)
         )
 
     if hw and mh_a is not None and mh_i is not None:
         out.append(
-            _metric("hip_lateral_downswing", abs(mh_i[0] - mh_a[0]) / hw, conf)
+            make_metric("hip_lateral_downswing", abs(mh_i[0] - mh_a[0]) / hw, conf)
         )
 
     sw = _body_scale(keypoints, address)
@@ -387,7 +402,7 @@ def compute_metrics(
             if n is None:
                 continue
             max_d = max(max_d, float(np.linalg.norm(n - nose0)))
-        out.append(_metric("head_movement", max_d / sw, conf))
+        out.append(make_metric("head_movement", max_d / sw, conf))
 
     # Lead-arm angles come from the reliability-gated path (posture.py), not
     # from a raw single-frame angle here.
@@ -404,21 +419,21 @@ def compute_metrics(
         if lm["limb"] != "arm" or lm["role"] != "lead" or not lm["scorable"]:
             continue
         if lm["event"] == "top":
-            out.append(_metric("lead_arm_angle_top", lm["valueDeg"], lm["confidence"]))
+            out.append(make_metric("lead_arm_angle_top", lm["valueDeg"], lm["confidence"]))
         elif lm["event"] == "impact":
             out.append(
-                _metric("lead_arm_angle_impact", lm["valueDeg"], lm["confidence"])
+                make_metric("lead_arm_angle_impact", lm["valueDeg"], lm["confidence"])
             )
 
     peaks = _kinematic_peaks(keypoints, top, impact)
     if peaks:
-        out.append(_metric("kinematic_sequence_index", _sequence_index(*peaks), conf * 0.85))
+        out.append(make_metric("kinematic_sequence_index", _sequence_index(*peaks), conf * 0.85))
 
     stance = _stance_w(keypoints, address)
     mh_f = _mid(_xy(keypoints, finish, L_HIP), _xy(keypoints, finish, R_HIP))
     la = _xy(keypoints, address, L_ANKLE)
     if stance and mh_f is not None and la is not None:
         val = (mh_f[0] - la[0]) / stance
-        out.append(_metric("weight_forward_finish", min(1.0, max(0.0, val)), conf * 0.8))
+        out.append(make_metric("weight_forward_finish", min(1.0, max(0.0, val)), conf * 0.8))
 
     return out

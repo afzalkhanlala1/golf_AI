@@ -76,3 +76,6 @@ Test vedio *.mp4
 # Pose model weights — downloaded at image build / on demand, never committed
 inference/models/
 *.task
+
+# run_local.py output — a scratch dump of one local analysis run
+inference/local_result.json

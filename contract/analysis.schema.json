@@ -158,7 +158,8 @@
                   "ratio",
                   "norm",
                   "ms",
-                  "index"
+                  "index",
+                  "mph"
                 ]
               },
               "phase": {
@@ -307,6 +308,69 @@
             "additionalProperties": false
           },
           "default": []
+        },
+        "club": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "tracked": {
+                  "type": "boolean"
+                },
+                "scalePxPerM": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "speedUnavailableReason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "not_tracked",
+                        "not_tracked_at_impact",
+                        "needs_face_on",
+                        "needs_high_fps",
+                        "needs_3d_pose",
+                        "implausible_result",
+                        "tracking_failed"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "ballUnavailableReason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "needs_120fps",
+                        "not_detected",
+                        "needs_clubhead_speed"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "tracked",
+                "scalePxPerM",
+                "speedUnavailableReason",
+                "ballUnavailableReason"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "faults": {
           "type": "array",

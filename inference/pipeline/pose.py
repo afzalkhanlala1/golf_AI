@@ -41,12 +41,35 @@ import numpy as np
 
 @dataclass
 class PoseSequence:
-    """keypoints: (T, 21, 3) with x, y, confidence — see MP_TO_KP above."""
+    """keypoints: (T, 21, 3) with x, y, confidence — see MP_TO_KP above.
+
+    world: (T, 21, 4) with x, y, z, visibility in METRES, origin at the
+    midpoint of the hips. This is MediaPipe's own metric reconstruction
+    (`pose_world_landmarks`), which the Tasks API returns alongside the
+    image-space landmarks and which this pipeline previously discarded.
+
+    Two things depend on it:
+
+      1. 3D skeleton playback — the depth axis is measured here, not
+         inferred from a 2D projection.
+      2. The pixels→metres scale used for speed estimation. Shoulder width
+         in metres (world) against shoulder width in pixels (image) gives a
+         per-frame scale without asking the golfer for their height.
+
+    The RTMPose backend has no 3D head, so on that backend `world` comes
+    back all zeros and every consumer treats it as unobserved — the same
+    rule the feet follow at indices 17-20.
+    """
 
     keypoints: np.ndarray
+    world: np.ndarray
     multiple_people: bool
     pose_confidence_mean: float
     full_body_in_frame: bool
+
+    def has_world(self) -> bool:
+        """True when a usable metric reconstruction came back."""
+        return bool(self.world.size) and bool((self.world[:, :, 3] > 0.3).any())
 
 
 # MediaPipe emits 33 landmarks; index i here is the MediaPipe landmark that
@@ -179,6 +202,7 @@ def _run_mediapipe(frames: list[np.ndarray], fps: float = 30.0) -> PoseSequence:
 
     T = len(frames)
     out = np.zeros((T, NUM_KEYPOINTS, 3), dtype=np.float32)
+    world = np.zeros((T, NUM_KEYPOINTS, 4), dtype=np.float32)
     confs: list[float] = []
     full_body_flags: list[bool] = []
 
@@ -212,6 +236,21 @@ def _run_mediapipe(frames: list[np.ndarray], fps: float = 30.0) -> PoseSequence:
             # exactly the signal posture.py's occlusion gate needs.
             out[t, kp_idx, 2] = float(getattr(lm, "visibility", 0.0))
 
+        # Metric reconstruction, hip-origin, in metres. Separate landmark
+        # list from the image-space one above — same indices, different
+        # coordinate system, so it is mapped through MP_TO_KP identically.
+        world_sets = getattr(result, "pose_world_landmarks", None)
+        if world_sets:
+            wlms = world_sets[0]
+            for kp_idx, mp_idx in enumerate(MP_TO_KP):
+                if mp_idx >= len(wlms):
+                    continue
+                wl = wlms[mp_idx]
+                world[t, kp_idx, 0] = float(wl.x)
+                world[t, kp_idx, 1] = float(wl.y)
+                world[t, kp_idx, 2] = float(wl.z)
+                world[t, kp_idx, 3] = float(getattr(wl, "visibility", 0.0))
+
         # Mean confidence and full-body check both deliberately stay scoped
         # to the original 17 body points (0:17), not the appended feet —
         # feet being briefly out of frame (a common camera crop) shouldn't
@@ -222,6 +261,7 @@ def _run_mediapipe(frames: list[np.ndarray], fps: float = 30.0) -> PoseSequence:
     mean_conf = float(np.mean(confs)) if confs else 0.0
     return PoseSequence(
         keypoints=out,
+        world=world,
         # mp.solutions.Pose is single-person by design, so a second golfer
         # in frame cannot be detected here — unlike the RTMPose path, which
         # ran a multi-person detector. Reported as False rather than
@@ -250,6 +290,10 @@ def _run_rtmpose(frames: list[np.ndarray]) -> PoseSequence:
     # a guessed foot position is not a measurement.
     T = len(frames)
     out = np.zeros((T, NUM_KEYPOINTS, 3), dtype=np.float32)
+    # rtmlib's Body model is 2D-only. Left at zeros so has_world() reports
+    # False and the 3D player / speed scale fall back rather than replay a
+    # flat skeleton that looks like depth but isn't.
+    world = np.zeros((T, NUM_KEYPOINTS, 4), dtype=np.float32)
     multiple = False
     confs: list[float] = []
     full_body_flags: list[bool] = []
@@ -305,6 +349,7 @@ def _run_rtmpose(frames: list[np.ndarray]) -> PoseSequence:
     mean_conf = float(np.mean(confs)) if confs else 0.0
     return PoseSequence(
         keypoints=out,
+        world=world,
         multiple_people=multiple,
         pose_confidence_mean=mean_conf,
         full_body_in_frame=bool(np.mean(full_body_flags) > 0.7)
