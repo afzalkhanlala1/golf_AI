@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { getAuthUserId } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/db";
-import { swings } from "@/lib/db/schema";
+import { swingEvents, swings } from "@/lib/db/schema";
 
 export const runtime = "nodejs";
 
@@ -16,6 +16,11 @@ type Params = { params: Promise<{ id: string }> };
  * fetch will not transparently inflate it — we gunzip here and hand the
  * client plain JSON. Going through this route (rather than exposing the blob
  * URL directly) keeps the ownership check on the server.
+ *
+ * The swing's detected events ride along in the response. The 3D player
+ * aligns a ghost swing to the primary one through their shared events, so
+ * it needs both together; returning them here keeps loading a ghost to a
+ * single request instead of a blob fetch plus an analysis fetch.
  */
 export async function GET(_request: Request, { params }: Params) {
   const userId = await getAuthUserId();
@@ -74,7 +79,16 @@ export async function GET(_request: Request, { params }: Params) {
   }
 
   try {
-    return NextResponse.json(JSON.parse(text));
+    const payload = JSON.parse(text);
+    const rows = await db
+      .select({
+        event: swingEvents.event,
+        frame: swingEvents.frame,
+        timestampMs: swingEvents.timestampMs,
+      })
+      .from(swingEvents)
+      .where(eq(swingEvents.swingId, id));
+    return NextResponse.json({ ...payload, events: rows });
   } catch {
     return NextResponse.json(
       { error: "Stored keypoints were not valid JSON." },

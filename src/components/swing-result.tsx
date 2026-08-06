@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { SwingPlayer } from "@/components/swing-player";
+import { SwingPlayer3D } from "@/components/swing-player-3d";
 
 /**
  * Which body region each TPI fault should light up in the overlay, so a
@@ -86,6 +87,46 @@ export function SwingResult({ id }: { id: string }) {
   const [data, setData] = useState<SwingPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openPhase, setOpenPhase] = useState<string | null>("downswing");
+  const [view, setView] = useState<"video" | "3d">("video");
+  const [ghostOptions, setGhostOptions] = useState<Array<{ id: string; label: string }>>([]);
+
+  // Other analysed swings, offered as ghost comparisons in the 3D view.
+  // Only swings that finished analysis have keypoints to overlay.
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/swings", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { swings: [] }))
+      .then((json: { swings?: Array<Record<string, unknown>> }) => {
+        if (!alive) return;
+        const rows = (json.swings ?? [])
+          .filter(
+            (s) =>
+              s.id !== id && s.status === "COMPLETE" && Boolean(s.keypointsUrl),
+          )
+          .slice(0, 20)
+          .map((s) => {
+            const created = s.createdAt ? new Date(String(s.createdAt)) : null;
+            const when = created
+              ? created.toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                })
+              : "earlier";
+            return {
+              id: String(s.id),
+              label: s.club ? `${when} · ${String(s.club)}` : when,
+            };
+          });
+        setGhostOptions(rows);
+      })
+      .catch(() => {
+        // A missing ghost list is not worth surfacing — the 3D view works
+        // perfectly well without a comparison, and the picker just hides.
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id]);
 
   useEffect(() => {
     let alive = true;
@@ -201,18 +242,48 @@ export function SwingResult({ id }: { id: string }) {
 
       <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-4">
-          <SwingPlayer
-            swingId={swing.id}
-            blobUrl={swing.blobUrl}
-            events={events}
-            faultRegions={[
-              ...new Set(
-                faults
-                  .map((f) => FAULT_REGION[f.code])
-                  .filter((r): r is string => !!r),
-              ),
-            ]}
-          />
+          <div className="flex gap-1 rounded-lg bg-[color:var(--mist)] p-1 text-xs">
+            {(
+              [
+                ["video", "Video"],
+                ["3d", "3D skeleton"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setView(key)}
+                className={`flex-1 rounded-md px-3 py-1.5 transition ${
+                  view === key
+                    ? "bg-[color:var(--fairway)] text-[color:var(--primary-foreground)]"
+                    : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Both players stay mounted — swapping tabs should not re-fetch
+              the keypoint blob or throw away the camera angle the golfer
+              just set up. */}
+          <div className={view === "video" ? "" : "hidden"}>
+            <SwingPlayer
+              swingId={swing.id}
+              blobUrl={swing.blobUrl}
+              events={events}
+              faultRegions={[
+                ...new Set(
+                  faults
+                    .map((f) => FAULT_REGION[f.code])
+                    .filter((r): r is string => !!r),
+                ),
+              ]}
+            />
+          </div>
+          <div className={view === "3d" ? "" : "hidden"}>
+            <SwingPlayer3D swingId={swing.id} ghostOptions={ghostOptions} />
+          </div>
         </div>
 
         <div className="space-y-6">
