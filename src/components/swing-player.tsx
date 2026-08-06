@@ -9,6 +9,7 @@ import {
   stableScale,
   type TrailPoint,
 } from "@/lib/overlay/ghost2d";
+import { extendLine, fitPlaneLine } from "@/lib/overlay/plane";
 import { buildTimeWarp } from "@/lib/overlay/time-warp";
 import { GROUP_COLORS } from "@/lib/segmentation/body-parts";
 import {
@@ -25,6 +26,7 @@ import {
 type EventRow = { event: string; frame: number; timestampMs?: number };
 
 const GHOST_COLOR = "#6aa8ff";
+const PLANE_COLOR = "#ffd23f";
 const HAND_PATH_COLD = [130, 210, 255] as const;
 const HAND_PATH_HOT = [120, 255, 170] as const;
 
@@ -265,6 +267,7 @@ export function SwingPlayer({
   const [tracer, setTracer] = useState<TracerPoint[] | null>(null);
   const [showTracer, setShowTracer] = useState(true);
   const [showHandPath, setShowHandPath] = useState(true);
+  const [showPlane, setShowPlane] = useState(false);
   const [unavailable, setUnavailable] = useState<string | null>(null);
 
   const [ghostId, setGhostId] = useState("");
@@ -347,6 +350,28 @@ export function SwingPlayer({
     return smoothTrail(handPath(frames, 0, frames.length - 1));
   }, [frames]);
 
+  /**
+   * Fitted over top → impact only. A plane line is a statement about the
+   * downswing; including the backswing and follow-through would average
+   * three different paths into a line that describes none of them.
+   *
+   * Prefers the clubhead when it was tracked — that is the real swing
+   * plane. Falls back to the hand path, which is a genuinely different and
+   * steeper line, so the label says which one is on screen.
+   */
+  const plane = useMemo(() => {
+    const frameOf = (name: string) => events.find((e) => e.event === name)?.frame;
+    const top = frameOf("top");
+    const impact = frameOf("impact");
+    if (top === undefined || impact === undefined || impact <= top) return null;
+
+    const fromClub = tracer && tracer.length > 3 ? fitPlaneLine(tracer, top, impact) : null;
+    if (fromClub) return { fit: fromClub, source: "club" as const };
+
+    const fromHands = fitPlaneLine(trail, top, impact);
+    return fromHands ? { fit: fromHands, source: "hands" as const } : null;
+  }, [events, tracer, trail]);
+
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = speed;
   }, [speed, frames]);
@@ -367,6 +392,22 @@ export function SwingPlayer({
       // Scale line weights off the clip's own size so the overlay looks the
       // same on a 480px portrait clip and a 1080p one.
       const unit = Math.max(meta.width, meta.height) / 480;
+
+      // Plane line first — it is a background reference to read everything
+      // else against, so it sits behind even the trails.
+      if (showPlane && plane) {
+        const { a, b } = extendLine(plane.fit, meta.width, meta.height);
+        ctx.save();
+        ctx.setLineDash([10 * unit, 7 * unit]);
+        ctx.strokeStyle = PLANE_COLOR;
+        ctx.lineWidth = 2 * unit;
+        ctx.globalAlpha = 0.85;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+        ctx.restore();
+      }
 
       // Trails under the skeleton: both the club and the hands pass behind
       // the body through much of the downswing, and drawing them on top
@@ -506,6 +547,8 @@ export function SwingPlayer({
       ghost,
       ghostWarp,
       ghostScale,
+      showPlane,
+      plane,
     ],
   );
 
@@ -630,8 +673,33 @@ export function SwingPlayer({
               >
                 Club tracer
               </Toggle>
+              <Toggle
+                on={showPlane}
+                onClick={() => setShowPlane((v) => !v)}
+                swatch={PLANE_COLOR}
+                disabled={!plane}
+                title={
+                  !plane ? "Needs a detected top and impact to fit a plane" : undefined
+                }
+              >
+                Plane
+              </Toggle>
             </div>
           </div>
+
+          {showPlane && plane && (
+            <p className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--ink-muted)]">
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-sm"
+                style={{ background: PLANE_COLOR }}
+              />
+              {plane.source === "club"
+                ? "Club plane — fitted to the tracked clubhead from top to impact"
+                : "Hand plane — fitted to your hand path from top to impact. The clubhead travels on a flatter plane than the hands, so this is not the club's plane; tracking the club needs 60fps."}
+              {" · "}
+              <strong>{plane.fit.angleFromVertical.toFixed(0)}° from vertical</strong>
+            </p>
+          )}
 
           {ghostOptions.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 text-sm">
