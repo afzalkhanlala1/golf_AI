@@ -1,11 +1,19 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   BALL_SPEED_COPY,
   CLUB_SPEED_COPY,
   type BallSpeedReason,
   type ClubSpeedReason,
 } from "@/lib/swings/club-copy";
+import {
+  SPEED_UNITS,
+  SPEED_UNIT_LABEL,
+  fromMph,
+  normalizeSpeedUnit,
+  type SpeedUnit,
+} from "@/lib/i18n/units";
 
 type Metric = { key: string; value: number; unit: string; confidence: number };
 
@@ -31,6 +39,26 @@ export function ClubDeliveryCard({
   metrics: Metric[];
   clubTracking: ClubTracking;
 }) {
+  const [unit, setUnit] = useState<SpeedUnit>("mph");
+
+  useEffect(() => {
+    fetch("/api/profile", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (j?.profile) setUnit(normalizeSpeedUnit(j.profile.speedUnit));
+      })
+      .catch(() => {});
+  }, []);
+
+  function changeUnit(next: SpeedUnit) {
+    setUnit(next);
+    void fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ speedUnit: next }),
+    }).catch(() => {});
+  }
+
   const by = new Map(metrics.map((m) => [m.key, m]));
   const clubhead = by.get("clubhead_speed_mph");
   const ball = by.get("ball_speed_mph");
@@ -50,23 +78,49 @@ export function ClubDeliveryCard({
 
   return (
     <section className="rounded-xl border border-[color:var(--line)] p-4">
-      <h2 className="text-sm uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">
-        Club delivery
-      </h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">
+          Club delivery
+        </h2>
+        {(clubhead || ball) && (
+          <div className="flex gap-0.5 rounded-md bg-[color:var(--mist)] p-0.5">
+            {SPEED_UNITS.map((u) => (
+              <button
+                key={u}
+                type="button"
+                onClick={() => changeUnit(u)}
+                className={`rounded px-2 py-0.5 text-[11px] transition ${
+                  unit === u
+                    ? "bg-[color:var(--fairway)] text-[color:var(--primary-foreground)]"
+                    : "text-[color:var(--ink-muted)]"
+                }`}
+              >
+                {SPEED_UNIT_LABEL[u]}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {hasAny ? (
         <>
           <div className="mt-3 grid grid-cols-2 gap-4">
             <Stat
               label="Clubhead speed"
-              value={clubhead ? clubhead.value.toFixed(1) : null}
-              suffix="mph"
+              value={
+                clubhead
+                  ? fromMph(clubhead.value, unit).toFixed(unit === "kmh" ? 0 : 1)
+                  : null
+              }
+              suffix={SPEED_UNIT_LABEL[unit]}
               confidence={clubhead?.confidence}
             />
             <Stat
               label="Ball speed"
-              value={ball ? ball.value.toFixed(1) : null}
-              suffix="mph"
+              value={
+                ball ? fromMph(ball.value, unit).toFixed(unit === "kmh" ? 0 : 1) : null
+              }
+              suffix={SPEED_UNIT_LABEL[unit]}
               confidence={ball?.confidence}
             />
             <Stat

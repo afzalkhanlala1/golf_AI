@@ -15,6 +15,13 @@
       "when": 1786032076441,
       "tag": "0001_huge_bushwacker",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786044810828,
+      "tag": "0002_absent_red_skull",
+      "breakpoints": true
     }
   ]
 }

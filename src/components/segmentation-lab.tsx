@@ -11,6 +11,7 @@ import {
   type BodyPartId,
 } from "@/lib/segmentation/body-parts";
 import { Button } from "@/components/ui/button";
+import { VideoSourcePicker } from "@/components/video-source-picker";
 import { buildDemoSequence } from "@/lib/segmentation/demo-sequence";
 import {
   extractPoseFromVideo,
@@ -56,7 +57,6 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number | undefined>(undefined);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [mode, setMode] = useState<Mode>("upload");
   const [selectedId, setSelectedId] = useState<string>(swings[0]?.id ?? "");
@@ -314,29 +314,16 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
 
       {mode === "upload" && (
         <div className="space-y-3">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="video/*"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void handleFile(f);
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={loading}
-            className="flex w-full flex-col items-center justify-center rounded-xl border border-dashed border-[color:var(--fairway-soft)] bg-white/60 px-4 py-8 text-center transition hover:bg-white disabled:opacity-60"
-          >
-            <span className="font-medium text-[color:var(--fairway)]">
+          <div className="rounded-xl border border-dashed border-[color:var(--fairway-soft)] bg-white/60 p-5">
+            <p className="mb-3 font-medium text-[color:var(--fairway)]">
               {uploadName ?? "Choose a video to segment"}
-            </span>
-            <span className="mt-1 text-sm text-[color:var(--ink-muted)]">
-              Runs entirely in your browser — nothing is uploaded, any framerate works
-            </span>
-          </button>
+            </p>
+            <VideoSourcePicker
+              busy={loading}
+              onSelect={(f) => void handleFile(f)}
+              hint="Runs in your browser — nothing is uploaded, any framerate works"
+            />
+          </div>
 
           {loading && (
             <div className="space-y-1">

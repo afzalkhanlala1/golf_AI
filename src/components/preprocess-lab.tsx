@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { VideoSourcePicker } from "@/components/video-source-picker";
 import {
   DEFAULT_OPTIONS,
   LOW_RESOLUTION_EDGE,
@@ -27,7 +28,6 @@ type Built = {
 const MAX_SOURCE_FRAMES = 90;
 
 export function PreprocessLab() {
-  const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [probe, setProbe] = useState<ClipProbe | null>(null);
   const [opts, setOpts] = useState<EnhanceOptions>(DEFAULT_OPTIONS);
@@ -162,29 +162,16 @@ export function PreprocessLab() {
 
   return (
     <div className="mt-8 space-y-8">
-      <input
-        ref={inputRef}
-        type="file"
-        accept="video/*"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) void onPick(f);
-        }}
-      />
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        disabled={busy}
-        className="flex w-full flex-col items-center justify-center rounded-xl border border-dashed border-[color:var(--fairway-soft)] bg-white/60 px-4 py-8 text-center transition hover:bg-white disabled:opacity-60"
-      >
-        <span className="font-medium text-[color:var(--fairway)]">
+      <div className="rounded-xl border border-dashed border-[color:var(--fairway-soft)] bg-white/60 p-5">
+        <p className="mb-3 font-medium text-[color:var(--fairway)]">
           {file?.name ?? "Choose a video to inspect"}
-        </span>
-        <span className="mt-1 text-sm text-[color:var(--ink-muted)]">
-          Runs entirely in your browser — nothing is uploaded
-        </span>
-      </button>
+        </p>
+        <VideoSourcePicker
+          busy={busy}
+          onSelect={(f) => void onPick(f)}
+          hint="Runs entirely in your browser — nothing is uploaded"
+        />
+      </div>
 
       {error && (
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">

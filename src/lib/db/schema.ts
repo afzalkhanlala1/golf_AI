@@ -39,6 +39,13 @@ export const users = pgTable("users", {
   wristToFloorCm: real("wrist_to_floor_cm"),
   /** BCP-47. Drives UI copy and the language coaching is written in. */
   locale: text("locale").notNull().default("en"),
+  /**
+   * Speed units for display only. The pipeline measures and stores mph
+   * throughout — converting at the boundary keeps one unit in the database
+   * and avoids the class of bug where a stored number's unit depends on who
+   * happened to record it.
+   */
+  speedUnit: text("speed_unit").notNull().default("mph"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { SUPPORTED_LOCALES } from "@/lib/i18n/locales";
+import { SPEED_UNITS } from "@/lib/i18n/units";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,7 @@ const ProfilePatch = z.object({
   wristToFloorCm: z.number().min(50).max(120).nullable().optional(),
   handicap: z.number().min(-10).max(54).nullable().optional(),
   locale: z.enum(SUPPORTED_LOCALES).optional(),
+  speedUnit: z.enum(SPEED_UNITS).optional(),
 });
 
 export async function GET() {
@@ -31,6 +33,7 @@ export async function GET() {
       wristToFloorCm: users.wristToFloorCm,
       handicap: users.handicap,
       locale: users.locale,
+      speedUnit: users.speedUnit,
     })
     .from(users)
     .where(eq(users.id, userId))
@@ -42,6 +45,7 @@ export async function GET() {
       wristToFloorCm: null,
       handicap: null,
       locale: "en",
+      speedUnit: "mph",
     },
   });
 }

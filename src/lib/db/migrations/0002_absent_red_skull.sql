@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "speed_unit" text DEFAULT 'mph' NOT NULL;
