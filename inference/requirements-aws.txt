@@ -1,0 +1,11 @@
+# Lambda image deps. Deliberately excludes torch/torchvision/rtmlib/
+# onnxruntime — those exist only for the optional RTMPose backend and would
+# add well over a gigabyte to the image for code this deployment never runs.
+# To use POSE_BACKEND=rtmpose on AWS, add them back and expect a much larger
+# image and slower cold starts.
+numpy>=1.26.0
+opencv-python-headless>=4.10.0
+av>=12.0.0
+httpx>=0.27.0
+mediapipe>=0.10.14
+boto3>=1.34.0

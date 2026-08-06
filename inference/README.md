@@ -116,3 +116,66 @@ Same body (callback optional). Blocks until `AnalysisResult` is ready. Used by `
 ## Checkpoint D
 
 After deploy + env flip, upload a real slow-motion swing in the app and confirm status goes `QUEUED → PROCESSING → COMPLETE` with metrics, faults, and feedback.
+
+## Deploying to AWS Lambda (alternative to Modal)
+
+The service also runs on Lambda as a container image. Viable because the
+default MediaPipe backend is CPU-only — no GPU instance, scale-to-zero
+between swings, billed per millisecond of actual analysis.
+
+The HTTP contract is identical to the Modal deployment, so the web app needs
+no change beyond pointing `INFERENCE_URL` at the Function URL.
+
+### Credentials
+
+**Never paste an access key into a chat, a commit, or a command argument.**
+Configure it once, locally:
+
+```bash
+aws configure          # prompts for key, secret, region — stored in ~/.aws
+```
+
+or export for the current shell only:
+
+```bash
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+export AWS_DEFAULT_REGION=us-east-1
+```
+
+`deploy-aws.sh` reads whichever of those is present. It never accepts a key
+as an argument, so nothing secret lands in your shell history.
+
+Use a dedicated IAM user, not root: create one, attach `aws-iam-policy.json`
+(replace `ACCOUNT_ID` and `REGION`), and generate its access key.
+
+### Deploy
+
+```bash
+cd inference && ./deploy-aws.sh
+```
+
+Idempotent — re-run it to ship an update. It creates the ECR repo, builds
+and pushes the image, creates the execution role, creates or updates the
+function, and prints the Function URL.
+
+Then set `INFERENCE_URL` to that URL in Vercel and in `.env.local`. Leave
+`INFERENCE_MODE=modal`; it selects the HTTP client, which is the same for
+both platforms.
+
+### How it stays async
+
+Analysis takes 45–90s but the caller expects an immediate 202. A Lambda
+cannot respond and keep working, so `/analyze` re-invokes the same function
+asynchronously with the job payload and returns 202; the async copy runs the
+pipeline and posts the HMAC-signed callback. That is why the execution role
+grants `lambda:InvokeFunction` on its own ARN.
+
+### Notes
+
+- `requirements-aws.txt` omits torch/rtmlib/onnxruntime — they exist only
+  for the optional RTMPose backend and would add >1GB to the image. To run
+  `POSE_BACKEND=rtmpose` on AWS, add them back and expect slower cold starts.
+- Memory is 3008MB: on Lambda, CPU scales with memory, so this is a speed
+  setting as much as a memory one.
+- First request after idle pays a cold start (image pull + model load).
