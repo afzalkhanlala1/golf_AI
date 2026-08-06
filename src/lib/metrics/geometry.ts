@@ -1,4 +1,16 @@
-/** COCO-17 keypoint indices */
+/**
+ * COCO-17 keypoint indices, plus 4 foot points appended at 17-20.
+ *
+ * The extra 4 are real landmarks (heel + toe per side), not a geometric
+ * guess extrapolated past the ankle — MediaPipe's native 33-point output
+ * already includes them (indices 29-32), we were just discarding them in
+ * the COCO mapping. RTMPose's plain Body model does not emit feet, so on
+ * that backend these come back zero-confidence and are omitted exactly
+ * like any other unobserved joint — missing is honest, wrong is not.
+ *
+ * Appended rather than inserted so every existing 0-16 index, and every
+ * fixture/consumer that only knows about 17 points, stays valid unchanged.
+ */
 export const KP = {
   nose: 0,
   leftShoulder: 5,
@@ -13,6 +25,10 @@ export const KP = {
   rightKnee: 14,
   leftAnkle: 15,
   rightAnkle: 16,
+  leftHeel: 17,
+  leftToe: 18,
+  rightHeel: 19,
+  rightToe: 20,
 } as const;
 
 export type Keypoint = { x: number; y: number; c: number };

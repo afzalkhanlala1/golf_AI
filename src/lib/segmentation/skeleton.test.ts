@@ -55,6 +55,17 @@ describe("skeleton definition", () => {
       expect(["torso", "arms", "legs", "head"]).toContain(b.group);
     }
   });
+
+  it("draws ankle-heel-toe as real foot bones", () => {
+    const has = (a: number, b: number) =>
+      BONES.some((bone) => (bone.a === a && bone.b === b) || (bone.a === b && bone.b === a));
+    expect(has(KP.leftAnkle, KP.leftHeel)).toBe(true);
+    expect(has(KP.leftHeel, KP.leftToe)).toBe(true);
+    expect(has(KP.rightAnkle, KP.rightHeel)).toBe(true);
+    expect(has(KP.rightHeel, KP.rightToe)).toBe(true);
+    expect(JOINTS).toContain(KP.leftHeel);
+    expect(JOINTS).toContain(KP.leftToe);
+  });
 });
 
 describe("isVisible", () => {

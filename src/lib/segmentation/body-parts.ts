@@ -1,9 +1,21 @@
 /**
  * Keypoint-anchored body-part segmentation.
  *
- * Partitions the golfer into named regions (head, back, pelvis, arms, legs)
- * derived from the COCO-17 pose we already compute — no extra model, no extra
+ * Partitions the golfer into named regions (head, back, pelvis, arms, legs,
+ * feet) derived from the pose we already compute — no extra model, no extra
  * GPU pass, and no licence exposure.
+ *
+ * FEET ARE REAL LANDMARKS, NOT A GUESS. Unlike every other region here
+ * (which is a bone thickened by an assumed width, since COCO-17 gives no
+ * limb width), the foot region is a triangle built from three actual
+ * observed points — ankle, heel, toe — because the pose pipeline now emits
+ * heel/toe when the backend provides them (MediaPipe does; a plain
+ * COCO-17-only backend like RTMPose's Body model does not, and the foot
+ * region simply won't materialise on that backend — omitted, not guessed).
+ * Foot orientation and lateral weight distribution are real coaching
+ * signals (weight staying on the trail foot too long, toe flare at
+ * address), which is why this one was worth the real landmarks rather than
+ * a shin extended past the ankle by an assumed length.
  *
  * WHY NOT A PIXEL-SEGMENTATION MODEL: the obvious candidates for true
  * per-pixel body-part masks are licensed non-commercially — Meta's Sapiens
@@ -29,7 +41,9 @@ export type BodyPartId =
   | "left_thigh"
   | "right_thigh"
   | "left_shin"
-  | "right_shin";
+  | "right_shin"
+  | "left_foot"
+  | "right_foot";
 
 export type BodyPartGroup = "head" | "torso" | "arms" | "legs";
 
@@ -61,6 +75,8 @@ export const PART_META: Record<
   right_thigh: { label: "Right thigh", group: "legs" },
   left_shin: { label: "Left shin", group: "legs" },
   right_shin: { label: "Right shin", group: "legs" },
+  left_foot: { label: "Left foot", group: "legs" },
+  right_foot: { label: "Right foot", group: "legs" },
 };
 
 /**
@@ -126,6 +142,27 @@ function limbQuad(
     { x: b.x + px * hb, y: b.y + py * hb },
     { x: b.x - px * hb, y: b.y - py * hb },
     { x: a.x - px * ha, y: a.y - py * ha },
+  ];
+}
+
+/**
+ * Foot polygon from three real observed points: ankle, heel, toe. Widened
+ * slightly perpendicular to the heel-toe line so it reads as a foot shape
+ * on screen rather than a hairline triangle, but the three vertices
+ * themselves are never invented.
+ */
+function footPolygon(ankle: Keypoint, heel: Keypoint, toe: Keypoint, scale: number): Point[] {
+  const dx = toe.x - heel.x;
+  const dy = toe.y - heel.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const px = (-dy / len) * scale * 0.06;
+  const py = (dx / len) * scale * 0.06;
+  return [
+    { x: ankle.x, y: ankle.y },
+    { x: heel.x + px, y: heel.y + py },
+    { x: toe.x + px, y: toe.y + py },
+    { x: toe.x - px, y: toe.y - py },
+    { x: heel.x - px, y: heel.y - py },
   ];
 }
 
@@ -262,6 +299,28 @@ export function segmentBodyParts(frame: PoseFrame): BodyPartRegion[] {
       limbQuad(a, b, scale * limb.wa, scale * limb.wb),
       Math.min(a.c, b.c),
     );
+  }
+
+  // Feet — only materialise on a backend that actually observed heel/toe
+  // (see module docstring). frame.length check keeps this a no-op against
+  // any 17-length COCO-only frame, current or historical, without throwing.
+  if (frame.length >= KP.rightToe + 1) {
+    const feet: Array<{ id: BodyPartId; ankle: number; heel: number; toe: number }> = [
+      { id: "left_foot", ankle: KP.leftAnkle, heel: KP.leftHeel, toe: KP.leftToe },
+      { id: "right_foot", ankle: KP.rightAnkle, heel: KP.rightHeel, toe: KP.rightToe },
+    ];
+    for (const foot of feet) {
+      const ankle = frame[foot.ankle];
+      const heel = frame[foot.heel];
+      const toe = frame[foot.toe];
+      if (!valid(ankle) || !valid(heel) || !valid(toe)) continue;
+      push(
+        out,
+        foot.id,
+        footPolygon(ankle, heel, toe, scale),
+        Math.min(ankle.c, heel.c, toe.c),
+      );
+    }
   }
 
   return out;

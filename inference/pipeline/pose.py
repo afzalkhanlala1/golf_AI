@@ -11,8 +11,14 @@ RTMPose remains available behind POSE_BACKEND=rtmpose. It is the more
 accurate backbone (see the build plan's model comparison), so keeping it
 one env var away means the choice can be revisited without a code change.
 
-Both backends emit the same COCO-17 (T, 17, 3) array of x, y, confidence,
-so everything downstream is backend-agnostic.
+Both backends emit the same (T, 21, 3) array of x, y, confidence — COCO-17
+at indices 0-16, plus 4 real foot landmarks (left/right heel, left/right
+toe) appended at 17-20. MediaPipe's native 33-point output already includes
+the foot points; RTMPose's plain Body model does not, so on that backend
+indices 17-20 come back zero-confidence and every downstream consumer
+(segmentation, metrics) treats them as unobserved rather than guessed —
+the same "missing is honest, wrong is not" rule everything else here
+follows.
 
 NOTE ON DATA PROTECTION: neither backend changes your GDPR position by
 itself. Both process the same video of the same identifiable person, in
@@ -35,7 +41,7 @@ import numpy as np
 
 @dataclass
 class PoseSequence:
-    """keypoints: (T, 17, 3) with x, y, confidence."""
+    """keypoints: (T, 21, 3) with x, y, confidence — see MP_TO_KP above."""
 
     keypoints: np.ndarray
     multiple_people: bool
@@ -44,9 +50,10 @@ class PoseSequence:
 
 
 # MediaPipe emits 33 landmarks; index i here is the MediaPipe landmark that
-# supplies COCO-17 keypoint i. Mirrors the mapping used in the browser path
-# (src/lib/segmentation/browser-pose.ts) — keep the two in step.
-MP_TO_COCO = [
+# supplies output keypoint i. Mirrors the mapping used in the browser path
+# (src/lib/segmentation/browser-pose.ts) and the KP indices in
+# src/lib/metrics/geometry.ts — keep all three in step.
+MP_TO_KP = [
     0,   # nose
     2,   # left eye
     5,   # right eye
@@ -64,7 +71,12 @@ MP_TO_COCO = [
     26,  # right knee
     27,  # left ankle
     28,  # right ankle
+    29,  # left heel
+    31,  # left foot index (toe)
+    30,  # right heel
+    32,  # right foot index (toe)
 ]
+NUM_KEYPOINTS = len(MP_TO_KP)  # 21
 
 _BODY = None
 _MP_POSE = None
@@ -166,7 +178,7 @@ def _run_mediapipe(frames: list[np.ndarray], fps: float = 30.0) -> PoseSequence:
     init_pose_model(_DEVICE)
 
     T = len(frames)
-    out = np.zeros((T, 17, 3), dtype=np.float32)
+    out = np.zeros((T, NUM_KEYPOINTS, 3), dtype=np.float32)
     confs: list[float] = []
     full_body_flags: list[bool] = []
 
@@ -189,18 +201,22 @@ def _run_mediapipe(frames: list[np.ndarray], fps: float = 30.0) -> PoseSequence:
             continue
 
         lms = landmark_sets[0]
-        for coco_idx, mp_idx in enumerate(MP_TO_COCO):
+        for kp_idx, mp_idx in enumerate(MP_TO_KP):
             if mp_idx >= len(lms):
                 continue
             lm = lms[mp_idx]
-            out[t, coco_idx, 0] = lm.x * w
-            out[t, coco_idx, 1] = lm.y * h
+            out[t, kp_idx, 0] = lm.x * w
+            out[t, kp_idx, 1] = lm.y * h
             # `visibility` is MediaPipe's own estimate that the joint was
             # genuinely observed rather than inferred behind an occlusion —
             # exactly the signal posture.py's occlusion gate needs.
-            out[t, coco_idx, 2] = float(getattr(lm, "visibility", 0.0))
+            out[t, kp_idx, 2] = float(getattr(lm, "visibility", 0.0))
 
-        confs.append(float(out[t, :, 2].mean()))
+        # Mean confidence and full-body check both deliberately stay scoped
+        # to the original 17 body points (0:17), not the appended feet —
+        # feet being briefly out of frame (a common camera crop) shouldn't
+        # tank the clip's overall confidence score or trip full_body_in_frame.
+        confs.append(float(out[t, :17, 2].mean()))
         full_body_flags.append(_full_body(out[t, :, :2], out[t, :, 2], w, h))
 
     mean_conf = float(np.mean(confs)) if confs else 0.0
@@ -226,8 +242,14 @@ def _run_rtmpose(frames: list[np.ndarray]) -> PoseSequence:
 
     import cv2
 
+    # rtmlib's plain Body model outputs COCO-17 only — no feet. Every frame
+    # is padded out to NUM_KEYPOINTS (21) below, so indices 17-20 simply
+    # stay at their np.zeros() confidence of 0 for this backend: the foot
+    # region is measured but not scored, same as any other joint the model
+    # never observed. Never approximated by extrapolating past the ankle —
+    # a guessed foot position is not a measurement.
     T = len(frames)
-    out = np.zeros((T, 17, 3), dtype=np.float32)
+    out = np.zeros((T, NUM_KEYPOINTS, 3), dtype=np.float32)
     multiple = False
     confs: list[float] = []
     full_body_flags: list[bool] = []
@@ -275,8 +297,8 @@ def _run_rtmpose(frames: list[np.ndarray]) -> PoseSequence:
 
         kpt = keypoints[idx]
         sc = scores[idx]
-        out[t, :, 0:2] = kpt
-        out[t, :, 2] = sc
+        out[t, :17, 0:2] = kpt
+        out[t, :17, 2] = sc
         confs.append(float(sc.mean()))
         full_body_flags.append(_full_body(kpt, sc, w, h))
 

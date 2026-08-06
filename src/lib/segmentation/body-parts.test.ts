@@ -7,9 +7,15 @@ import {
   type BodyPartId,
 } from "./body-parts";
 
-/** Anatomically plausible upright pose, image coords (y grows downward). */
+/**
+ * Anatomically plausible upright pose, image coords (y grows downward).
+ * 21 points by default (COCO-17 + real heel/toe), matching what the
+ * MediaPipe backend actually produces in production. Tests that want to
+ * exercise the RTMPose/COCO-only degradation path build their own
+ * 17-length frame explicitly (see "omits feet on a COCO-only frame" below).
+ */
 function uprightPose(overrides: Partial<Record<number, { x: number; y: number; c: number }>> = {}): PoseFrame {
-  const f: PoseFrame = Array.from({ length: 17 }, () => ({ x: 0, y: 0, c: 0 }));
+  const f: PoseFrame = Array.from({ length: 21 }, () => ({ x: 0, y: 0, c: 0 }));
   f[KP.nose] = { x: 100, y: 40, c: 0.9 };
   f[KP.leftShoulder] = { x: 80, y: 80, c: 0.9 };
   f[KP.rightShoulder] = { x: 120, y: 80, c: 0.9 };
@@ -23,6 +29,10 @@ function uprightPose(overrides: Partial<Record<number, { x: number; y: number; c
   f[KP.rightKnee] = { x: 114, y: 240, c: 0.9 };
   f[KP.leftAnkle] = { x: 85, y: 310, c: 0.9 };
   f[KP.rightAnkle] = { x: 115, y: 310, c: 0.9 };
+  f[KP.leftHeel] = { x: 80, y: 318, c: 0.9 };
+  f[KP.leftToe] = { x: 85, y: 330, c: 0.9 };
+  f[KP.rightHeel] = { x: 120, y: 318, c: 0.9 };
+  f[KP.rightToe] = { x: 115, y: 330, c: 0.9 };
   for (const [idx, kp] of Object.entries(overrides)) {
     f[Number(idx)] = kp!;
   }
@@ -117,6 +127,51 @@ describe("segmentBodyParts", () => {
       Math.max(...r.polygon.map((p) => p.x)) - Math.min(...r.polygon.map((p) => p.x));
     expect(width(farHead) / width(nearHead)).toBeCloseTo(2, 5);
   });
+
+  describe("feet", () => {
+    it("builds the foot polygon from the three real observed points, not a guess", () => {
+      const foot = segmentBodyParts(uprightPose()).find((r) => r.id === "left_foot")!;
+      expect(foot).toBeDefined();
+      // Every vertex must lie at or very near one of ankle/heel/toe (widened
+      // slightly perpendicular to heel->toe) — never an invented position.
+      const ankle = { x: 85, y: 310 };
+      const heel = { x: 80, y: 318 };
+      const toe = { x: 85, y: 330 };
+      const near = (p: { x: number; y: number }, q: { x: number; y: number }, tol = 10) =>
+        Math.hypot(p.x - q.x, p.y - q.y) < tol;
+      expect(foot.polygon.some((p) => near(p, ankle))).toBe(true);
+      expect(foot.polygon.some((p) => near(p, heel))).toBe(true);
+      expect(foot.polygon.some((p) => near(p, toe))).toBe(true);
+    });
+
+    it("omits a foot when heel/toe are below the confidence floor", () => {
+      const frame = uprightPose({
+        [KP.leftHeel]: { x: 80, y: 318, c: 0.01 },
+        [KP.leftToe]: { x: 85, y: 330, c: 0.01 },
+      });
+      const got = new Set(ids(segmentBodyParts(frame)));
+      expect(got.has("left_foot")).toBe(false);
+      // Everything upstream of the ankle is unaffected by missing feet.
+      expect(got.has("left_shin")).toBe(true);
+      expect(got.has("right_foot")).toBe(true);
+    });
+
+    it("omits both feet on a COCO-17-only frame (e.g. the RTMPose backend) rather than guessing", () => {
+      const cocoOnly: PoseFrame = Array.from({ length: 17 }, () => ({ x: 0, y: 0, c: 0 }));
+      cocoOnly[KP.leftShoulder] = { x: 80, y: 80, c: 0.9 };
+      cocoOnly[KP.rightShoulder] = { x: 120, y: 80, c: 0.9 };
+      cocoOnly[KP.leftHip] = { x: 88, y: 170, c: 0.9 };
+      cocoOnly[KP.rightHip] = { x: 112, y: 170, c: 0.9 };
+      cocoOnly[KP.leftKnee] = { x: 86, y: 240, c: 0.9 };
+      cocoOnly[KP.leftAnkle] = { x: 85, y: 310, c: 0.9 };
+
+      const got = new Set(ids(segmentBodyParts(cocoOnly)));
+      expect(got.has("left_foot")).toBe(false);
+      expect(got.has("right_foot")).toBe(false);
+      // The shin — a real region on this backend — still comes through.
+      expect(got.has("left_shin")).toBe(true);
+    });
+  });
 });
 
 describe("computePartMotion", () => {
@@ -138,6 +193,21 @@ describe("computePartMotion", () => {
     const head = motion.find((m) => m.id === "head");
     // A static head should register no motion at all.
     expect(head).toBeUndefined();
+  });
+
+  it("tracks foot motion — e.g. a heel lifting off the ground during the swing", () => {
+    const still = uprightPose();
+    const frames: PoseFrame[] = [];
+    for (let i = 0; i < 10; i++) {
+      const f: PoseFrame = still.map((k) => ({ ...k }));
+      // Trail heel rising through the downswing — a real, coachable signal.
+      f[KP.rightHeel] = { x: 120, y: 318 - i * 4, c: 0.9 };
+      frames.push(f);
+    }
+    const motion = computePartMotion(frames, 240);
+    const rightFoot = motion.find((m) => m.id === "right_foot");
+    expect(rightFoot).toBeDefined();
+    expect(rightFoot!.peakSpeed).toBeGreaterThan(0);
   });
 
   it("is scale-invariant — the same swing filmed closer scores the same speed", () => {

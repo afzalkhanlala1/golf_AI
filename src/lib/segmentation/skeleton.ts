@@ -1,5 +1,6 @@
 /**
- * COCO-17 skeleton geometry for the swing overlay.
+ * Skeleton geometry for the swing overlay — COCO-17 plus real heel/toe
+ * foot points (17-20) when the pose backend provides them.
  *
  * Pure functions only — the drawing itself lives in the player component,
  * but everything with a right answer (which bones exist, which region a
@@ -37,6 +38,14 @@ export const BONES: Bone[] = [
   { a: KP.leftKnee, b: KP.leftAnkle, group: "legs" },
   { a: KP.rightHip, b: KP.rightKnee, group: "legs" },
   { a: KP.rightKnee, b: KP.rightAnkle, group: "legs" },
+  // Feet — only draw when the backend actually observed heel/toe (a
+  // COCO-17-only backend leaves these zero-confidence, so isVisible()
+  // naturally skips them; see body-parts.ts's module doc for why feet are
+  // never approximated past the ankle).
+  { a: KP.leftAnkle, b: KP.leftHeel, group: "legs" },
+  { a: KP.leftHeel, b: KP.leftToe, group: "legs" },
+  { a: KP.rightAnkle, b: KP.rightHeel, group: "legs" },
+  { a: KP.rightHeel, b: KP.rightToe, group: "legs" },
 ];
 
 /** Joints drawn as dots — face points excluded, see BONES. */
@@ -53,6 +62,10 @@ export const JOINTS = [
   KP.rightKnee,
   KP.leftAnkle,
   KP.rightAnkle,
+  KP.leftHeel,
+  KP.leftToe,
+  KP.rightHeel,
+  KP.rightToe,
 ];
 
 /** Bigger dots for the joints a coach actually reads. */

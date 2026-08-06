@@ -1,13 +1,14 @@
 /**
  * Client-side pose extraction for the segmentation lab.
  *
- * SCOPE — this is a LAB PATH ONLY. Production swing analysis runs RTMPose on
- * the GPU service; that stays the source of truth for every metric, score and
- * fault. MediaPipe here exists purely so an arbitrary clip can be segmented
- * in the browser within seconds, with no upload, no GPU cost, and no
- * dependency on the inference service being warm. Its output must never feed
- * the scoring pipeline — MediaPipe is materially less accurate than RTMPose,
- * which is exactly why the production stack does not use it.
+ * SCOPE — this is a LAB PATH ONLY. Production swing analysis runs its own
+ * MediaPipe pass server-side (inference/pipeline/pose.py); that stays the
+ * source of truth for every metric, score and fault. This client-side copy
+ * exists purely so an arbitrary clip can be segmented in the browser within
+ * seconds, with no upload and no dependency on the inference service being
+ * warm — it uses the lighter `pose_landmarker_lite` model for that speed,
+ * where the server uses `_full`, so treat this path as good for eyeballing
+ * regions, not as a second source of truth.
  *
  * Licence: @mediapipe/tasks-vision is Apache-2.0.
  */
@@ -20,11 +21,13 @@ const MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 
 /**
- * MediaPipe emits 33 landmarks; the segmentation code (and the rest of this
- * app) speaks COCO-17. Index i of this array is the MediaPipe landmark that
- * supplies COCO keypoint i.
+ * MediaPipe emits 33 landmarks; index i of this array is the MediaPipe
+ * landmark that supplies output keypoint i — COCO-17 at 0-16, plus 4 real
+ * foot landmarks (heel/toe per side) appended at 17-20. Mirrors MP_TO_KP in
+ * inference/pipeline/pose.py and the KP indices in
+ * src/lib/metrics/geometry.ts — keep all three in step.
  */
-const MP_TO_COCO = [
+const MP_TO_KP = [
   0, // nose
   2, // left eye
   5, // right eye
@@ -42,29 +45,35 @@ const MP_TO_COCO = [
   26, // right knee
   27, // left ankle
   28, // right ankle
+  29, // left heel
+  31, // left foot index (toe)
+  30, // right heel
+  32, // right foot index (toe)
 ] as const;
+
+const NUM_KEYPOINTS = MP_TO_KP.length; // 21
 
 /** Cap on extracted frames — keeps a long clip from locking the tab up. */
 const MAX_FRAMES = 400;
 
 export type Landmark = { x: number; y: number; z: number; visibility?: number };
 
-/** Blank COCO-17 frame — every joint present but zero-confidence. */
+/** Blank frame — every joint present but zero-confidence. */
 export function emptyFrame(): PoseFrame {
-  return Array.from({ length: 17 }, () => ({ x: 0, y: 0, c: 0 }));
+  return Array.from({ length: NUM_KEYPOINTS }, () => ({ x: 0, y: 0, c: 0 }));
 }
 
 /**
- * Convert one MediaPipe landmark set (33 normalised points) into a COCO-17
- * frame in pixel coordinates. Pure — unit tested against the index map.
+ * Convert one MediaPipe landmark set (33 normalised points) into a frame in
+ * pixel coordinates. Pure — unit tested against the index map.
  */
-export function mediapipeToCoco(
+export function mediapipeToKeypoints(
   landmarks: Landmark[] | undefined,
   width: number,
   height: number,
 ): PoseFrame {
-  if (!landmarks || landmarks.length < 29) return emptyFrame();
-  return MP_TO_COCO.map((mpIndex) => {
+  if (!landmarks || landmarks.length < 33) return emptyFrame();
+  return MP_TO_KP.map((mpIndex) => {
     const p = landmarks[mpIndex];
     if (!p) return { x: 0, y: 0, c: 0 };
     return {
@@ -241,11 +250,11 @@ export async function extractPoseFromVideo(
         landmarks = undefined;
       }
 
-      if (!landmarks || landmarks.length < 29) {
+      if (!landmarks || landmarks.length < 33) {
         missedFrames += 1;
         frames.push(emptyFrame());
       } else {
-        frames.push(mediapipeToCoco(landmarks, width, height));
+        frames.push(mediapipeToKeypoints(landmarks, width, height));
       }
 
       if (onProgress && i % 5 === 0) onProgress((i + 1) / count);
