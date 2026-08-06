@@ -632,23 +632,38 @@ export function SwingPlayer({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="text-[color:var(--ink-muted)]">Speed</span>
-            {SPEEDS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setSpeed(s)}
-                className={`rounded-md px-2 py-1 text-xs transition ${
-                  speed === s
-                    ? "bg-[color:var(--fairway)] text-[color:var(--primary-foreground)]"
-                    : "bg-[color:var(--mist)] text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
-                }`}
-              >
-                {s === 1 ? "1×" : `${s}×`}
-              </button>
-            ))}
-            <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          {/* One panel rather than a wrapped row of loose buttons: playback
+              and overlays are different kinds of control and were reading as
+              one undifferentiated strip once the overlay count grew. */}
+          <div className="rounded-xl border border-[color:var(--line)] bg-[color:var(--mist)]/30 p-3">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] uppercase tracking-[0.14em] text-[color:var(--ink-muted)]">
+                  Speed
+                </span>
+                <div className="flex gap-0.5 rounded-md bg-[color:var(--mist)] p-0.5">
+                  {SPEEDS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setSpeed(s)}
+                      className={`rounded px-2 py-1 text-xs transition ${
+                        speed === s
+                          ? "bg-[color:var(--fairway)] text-[color:var(--primary-foreground)]"
+                          : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
+                      }`}
+                    >
+                      {s === 1 ? "1×" : `${s}×`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] uppercase tracking-[0.14em] text-[color:var(--ink-muted)]">
+                  Overlays
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
               <Toggle on={showSkeleton} onClick={() => setShowSkeleton((v) => !v)}>
                 Skeleton
               </Toggle>
@@ -684,6 +699,32 @@ export function SwingPlayer({
               >
                 Plane
               </Toggle>
+                </div>
+              </div>
+
+              {ghostOptions.length > 0 && (
+                <label className="ml-auto flex items-center gap-2">
+                  <span className="text-[11px] uppercase tracking-[0.14em] text-[color:var(--ink-muted)]">
+                    Ghost
+                  </span>
+                  <span
+                    className="inline-block h-2.5 w-2.5 rounded-full"
+                    style={{ background: GHOST_COLOR, opacity: ghostId ? 1 : 0.35 }}
+                  />
+                  <select
+                    value={ghostId}
+                    onChange={(e) => setGhostId(e.target.value)}
+                    className="rounded-md border border-[color:var(--line)] bg-transparent px-2 py-1 text-xs"
+                  >
+                    <option value="">None</option>
+                    {ghostOptions.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </div>
           </div>
 
@@ -701,39 +742,18 @@ export function SwingPlayer({
             </p>
           )}
 
-          {ghostOptions.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <label className="flex items-center gap-2 text-xs text-[color:var(--ink-muted)]">
-                <span
-                  className="inline-block h-2.5 w-2.5 rounded-full"
-                  style={{ background: GHOST_COLOR }}
-                />
-                Ghost swing
-                <select
-                  value={ghostId}
-                  onChange={(e) => setGhostId(e.target.value)}
-                  className="rounded-md border border-[color:var(--line)] bg-transparent px-2 py-1 text-xs"
-                >
-                  <option value="">None</option>
-                  {ghostOptions.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {ghost && (
-                <span className="text-xs text-[color:var(--ink-muted)]">
-                  Scaled to your shoulder width and lined up on shared events —
-                  orientation is left alone, since that difference is the point.
-                </span>
-              )}
-              {ghostError && (
-                <span className="text-xs text-[color:var(--ink-muted)]">
-                  {ghostError}
-                </span>
-              )}
-            </div>
+          {ghost && (
+            <p className="flex items-center gap-2 text-xs text-[color:var(--ink-muted)]">
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full"
+                style={{ background: GHOST_COLOR }}
+              />
+              Scaled to your leg span and lined up on shared events. Orientation
+              is left alone — that difference is the point.
+            </p>
+          )}
+          {ghostError && (
+            <p className="text-xs text-[color:var(--ink-muted)]">{ghostError}</p>
           )}
 
           {faultRegions.length > 0 && (
