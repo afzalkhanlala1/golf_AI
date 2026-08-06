@@ -2,6 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PoseFrame } from "@/lib/metrics/geometry";
+import {
+  alignGhostFrame,
+  handPath,
+  smoothTrail,
+  stableScale,
+  type TrailPoint,
+} from "@/lib/overlay/ghost2d";
+import { buildTimeWarp } from "@/lib/overlay/time-warp";
 import { GROUP_COLORS } from "@/lib/segmentation/body-parts";
 import {
   BONES,
@@ -14,7 +22,11 @@ import {
   trackingBox,
 } from "@/lib/segmentation/skeleton";
 
-type EventRow = { event: string; frame: number; timestampMs: number };
+type EventRow = { event: string; frame: number; timestampMs?: number };
+
+const GHOST_COLOR = "#6aa8ff";
+const HAND_PATH_COLD = [130, 210, 255] as const;
+const HAND_PATH_HOT = [120, 255, 170] as const;
 
 type TracerPoint = { f: number; x: number; y: number; c: number };
 
@@ -25,7 +37,19 @@ type KeypointPayload = {
   frames: number[][][];
   /** Clubhead path in image pixels. Null when the clip could not support one. */
   tracer: TracerPoint[] | null;
+  events?: EventRow[];
 };
+
+type GhostOption = { id: string; label: string };
+
+type GhostData = {
+  frames: PoseFrame[];
+  events: EventRow[];
+};
+
+function toPoseFrames(raw: number[][][]): PoseFrame[] {
+  return raw.map((f) => f.map(([x, y, c]) => ({ x: x ?? 0, y: y ?? 0, c: c ?? 0 })));
+}
 
 const SPEEDS = [0.25, 0.5, 1] as const;
 
@@ -38,6 +62,124 @@ const FAULT_COLOR = "#e0503a";
 const BONE_COLOR = "#ffffff";
 const OUTLINE = "rgba(0,0,0,0.55)";
 const BRACKET = "#f0a020";
+
+/** Overlay toggle with an optional colour swatch matching what it draws. */
+function Toggle({
+  on,
+  onClick,
+  children,
+  swatch,
+  disabled,
+  title,
+}: {
+  on: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  swatch?: string;
+  disabled?: boolean;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition ${
+        disabled
+          ? "cursor-not-allowed bg-[color:var(--mist)] text-[color:var(--ink-muted)] opacity-45"
+          : on
+            ? "bg-[color:var(--fairway)] text-[color:var(--primary-foreground)]"
+            : "bg-[color:var(--mist)] text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
+      }`}
+    >
+      {swatch && (
+        <span
+          className="inline-block h-2 w-2 rounded-full"
+          style={{ background: swatch, opacity: on && !disabled ? 1 : 0.4 }}
+        />
+      )}
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Draw a motion trail.
+ *
+ * The whole arc is laid down faintly so the shape is readable in a paused
+ * frame, then the part already played is drawn hot on top — so scrubbing
+ * shows *where in the arc* you are, which a single static polyline cannot.
+ */
+function drawTrail(
+  ctx: CanvasRenderingContext2D,
+  points: TrailPoint[],
+  index: number,
+  unit: number,
+  cold: readonly [number, number, number],
+  hot: readonly [number, number, number],
+  weight: number,
+) {
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.beginPath();
+  ctx.moveTo(points[0]!.x, points[0]!.y);
+  for (const p of points) ctx.lineTo(p.x, p.y);
+  ctx.strokeStyle = "rgba(255,255,255,0.14)";
+  ctx.lineWidth = 2 * unit * weight;
+  ctx.stroke();
+
+  const played = points.filter((p) => p.f <= index);
+  if (played.length < 2) return;
+
+  for (let i = 1; i < played.length; i++) {
+    const a = played[i - 1]!;
+    const b = played[i]!;
+    const t = i / (played.length - 1);
+    const col = cold.map((c, k) => Math.round(c + (hot[k]! - c) * t));
+    ctx.globalAlpha = 0.35 + 0.65 * Math.min(1, b.c * 1.4);
+    ctx.strokeStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+    ctx.lineWidth = (1.5 + 2 * t) * unit * weight;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  const head = played[played.length - 1]!;
+  ctx.beginPath();
+  ctx.arc(head.x, head.y, 3.5 * unit * weight, 0, Math.PI * 2);
+  ctx.fillStyle = `rgb(${hot[0]},${hot[1]},${hot[2]})`;
+  ctx.fill();
+}
+
+/**
+ * The reference swing, drawn translucent behind the live one.
+ *
+ * No outline and no joint dots — the ghost has to stay clearly secondary to
+ * the golfer's own skeleton, and outlining it would give it the same visual
+ * weight and turn the overlay into a tangle.
+ */
+function drawGhostSkeleton(
+  ctx: CanvasRenderingContext2D,
+  frame: PoseFrame,
+  unit: number,
+) {
+  ctx.globalAlpha = 0.55;
+  ctx.strokeStyle = GHOST_COLOR;
+  ctx.lineWidth = 4 * unit;
+  ctx.lineCap = "round";
+  for (const bone of BONES) {
+    if (!isVisible(frame, bone.a) || !isVisible(frame, bone.b)) continue;
+    ctx.beginPath();
+    ctx.moveTo(frame[bone.a]!.x, frame[bone.a]!.y);
+    ctx.lineTo(frame[bone.b]!.x, frame[bone.b]!.y);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
 
 /**
  * Draw the clubhead path.
@@ -101,12 +243,15 @@ export function SwingPlayer({
   blobUrl,
   events,
   faultRegions,
+  ghostOptions = [],
 }: {
   swingId: string;
   blobUrl: string;
   events: EventRow[];
   /** Body regions with an active fault, e.g. ["torso"]. */
   faultRegions: string[];
+  /** Other swings offered as an on-video ghost comparison. */
+  ghostOptions?: GhostOption[];
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -119,7 +264,12 @@ export function SwingPlayer({
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [tracer, setTracer] = useState<TracerPoint[] | null>(null);
   const [showTracer, setShowTracer] = useState(true);
+  const [showHandPath, setShowHandPath] = useState(true);
   const [unavailable, setUnavailable] = useState<string | null>(null);
+
+  const [ghostId, setGhostId] = useState("");
+  const [ghost, setGhost] = useState<GhostData | null>(null);
+  const [ghostError, setGhostError] = useState<string | null>(null);
 
   const faults = useMemo(() => new Set(faultRegions), [faultRegions]);
 
@@ -133,9 +283,7 @@ export function SwingPlayer({
       })
       .then((p) => {
         if (cancelled) return;
-        setFrames(
-          p.frames.map((f) => f.map(([x, y, c]) => ({ x: x ?? 0, y: y ?? 0, c: c ?? 0 }))),
-        );
+        setFrames(toPoseFrames(p.frames));
         setMeta({ fps: p.fps, width: p.width, height: p.height });
         setTracer(p.tracer ?? null);
       })
@@ -148,6 +296,56 @@ export function SwingPlayer({
       cancelled = true;
     };
   }, [swingId]);
+
+  useEffect(() => {
+    if (!ghostId) {
+      setGhost(null);
+      setGhostError(null);
+      return;
+    }
+    let cancelled = false;
+    setGhostError(null);
+    fetch(`/api/swings/${ghostId}/keypoints`, { cache: "no-store" })
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Could not load that swing");
+        return json as KeypointPayload;
+      })
+      .then((p) => {
+        if (cancelled) return;
+        setGhost({ frames: toPoseFrames(p.frames), events: p.events ?? [] });
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setGhost(null);
+        setGhostError(e instanceof Error ? e.message : "Could not load that swing");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ghostId]);
+
+  // Ghost frames are looked up through the two swings' shared events, so the
+  // overlay stays together at address, top and impact even at different
+  // tempos and clip lengths.
+  const ghostWarp = useMemo(() => {
+    if (!frames || !ghost) return null;
+    return buildTimeWarp(events, ghost.events, frames.length, ghost.frames.length);
+  }, [frames, ghost, events]);
+
+  // One scale for the whole clip — see stableScale for why per-frame makes
+  // the ghost pulse as it plays.
+  const ghostScale = useMemo(() => {
+    if (!frames || !ghost) return null;
+    return stableScale(frames, ghost.frames);
+  }, [frames, ghost]);
+
+  // Computed once for the whole clip rather than per draw — the path does
+  // not change as the video plays, only how much of it is revealed.
+  const trail = useMemo(() => {
+    if (!frames) return [];
+    return smoothTrail(handPath(frames, 0, frames.length - 1));
+  }, [frames]);
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = speed;
@@ -170,17 +368,30 @@ export function SwingPlayer({
       // same on a 480px portrait clip and a 1080p one.
       const unit = Math.max(meta.width, meta.height) / 480;
 
-      // Tracer under the skeleton: the club passes behind the body through
-      // most of the downswing, and drawing it on top would read as if it
-      // were in front.
+      // Trails under the skeleton: both the club and the hands pass behind
+      // the body through much of the downswing, and drawing them on top
+      // would read as if they were in front.
+      if (showHandPath && trail.length > 1) {
+        drawTrail(ctx, trail, index, unit, HAND_PATH_COLD, HAND_PATH_HOT, 1);
+      }
       if (showTracer && tracer && tracer.length > 1) {
         drawTracer(ctx, tracer, index, unit);
       }
 
-      if (!showSkeleton) return;
-
       const frame = frames[Math.max(0, Math.min(index, frames.length - 1))];
       if (!frame) return;
+
+      // Ghost beneath the live skeleton, so where they diverge the golfer's
+      // own body stays the readable one.
+      if (ghost && ghostWarp) {
+        const gf = ghost.frames[ghostWarp(index)];
+        if (gf) {
+          const aligned = alignGhostFrame(gf, frame, ghostScale ?? undefined);
+          if (aligned) drawGhostSkeleton(ctx, aligned, unit);
+        }
+      }
+
+      if (!showSkeleton) return;
 
       const box = trackingBox(frame, meta.width, meta.height);
       if (box) {
@@ -282,7 +493,20 @@ export function SwingPlayer({
         ctx.fillText(label, meta.width / 2, by + bh / 2);
       }
     },
-    [frames, meta, events, faults, showSkeleton, showTracer, tracer],
+    [
+      frames,
+      meta,
+      events,
+      faults,
+      showSkeleton,
+      showTracer,
+      tracer,
+      showHandPath,
+      trail,
+      ghost,
+      ghostWarp,
+      ghostScale,
+    ],
   );
 
   useEffect(() => {
@@ -381,25 +605,68 @@ export function SwingPlayer({
                 {s === 1 ? "1×" : `${s}×`}
               </button>
             ))}
-            <label className="ml-auto flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showSkeleton}
-                onChange={(e) => setShowSkeleton(e.target.checked)}
-              />
-              Skeleton
-            </label>
-            {tracer && tracer.length > 1 && (
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={showTracer}
-                  onChange={(e) => setShowTracer(e.target.checked)}
-                />
-                Tracer
-              </label>
-            )}
+            <div className="ml-auto flex flex-wrap items-center gap-1.5">
+              <Toggle on={showSkeleton} onClick={() => setShowSkeleton((v) => !v)}>
+                Skeleton
+              </Toggle>
+              <Toggle
+                on={showHandPath}
+                onClick={() => setShowHandPath((v) => !v)}
+                swatch={`rgb(${HAND_PATH_HOT.join(",")})`}
+                disabled={trail.length < 2}
+              >
+                Hand path
+              </Toggle>
+              <Toggle
+                on={showTracer}
+                onClick={() => setShowTracer((v) => !v)}
+                swatch={`rgb(${TRACER_HOT.join(",")})`}
+                disabled={!tracer || tracer.length < 2}
+                title={
+                  !tracer || tracer.length < 2
+                    ? "Club tracer needs a clip at 60fps or higher"
+                    : undefined
+                }
+              >
+                Club tracer
+              </Toggle>
+            </div>
           </div>
+
+          {ghostOptions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <label className="flex items-center gap-2 text-xs text-[color:var(--ink-muted)]">
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full"
+                  style={{ background: GHOST_COLOR }}
+                />
+                Ghost swing
+                <select
+                  value={ghostId}
+                  onChange={(e) => setGhostId(e.target.value)}
+                  className="rounded-md border border-[color:var(--line)] bg-transparent px-2 py-1 text-xs"
+                >
+                  <option value="">None</option>
+                  {ghostOptions.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {ghost && (
+                <span className="text-xs text-[color:var(--ink-muted)]">
+                  Scaled to your shoulder width and lined up on shared events —
+                  orientation is left alone, since that difference is the point.
+                </span>
+              )}
+              {ghostError && (
+                <span className="text-xs text-[color:var(--ink-muted)]">
+                  {ghostError}
+                </span>
+              )}
+            </div>
+          )}
 
           {faultRegions.length > 0 && (
             <p className="flex items-center gap-2 text-xs text-[color:var(--ink-muted)]">

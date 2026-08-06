@@ -279,6 +279,7 @@ export function SwingResult({ id }: { id: string }) {
               swingId={swing.id}
               blobUrl={swing.blobUrl}
               events={events}
+              ghostOptions={ghostOptions}
               faultRegions={[
                 ...new Set(
                   faults

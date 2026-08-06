@@ -14,6 +14,11 @@ import {
   type CoachView,
   type LiveCheck,
 } from "@/lib/coach/live-checks";
+import {
+  INITIAL_ANNOUNCER,
+  decideAnnouncement,
+  type AnnouncerState,
+} from "@/lib/coach/announcer";
 
 const STATUS_COLOR: Record<LiveCheck["status"], string> = {
   good: "#4ade80",
@@ -21,6 +26,42 @@ const STATUS_COLOR: Record<LiveCheck["status"], string> = {
   off: "#f87171",
   unknown: "#94a3b8",
 };
+
+/**
+ * Two-note rising chime for "setup is good".
+ *
+ * Synthesised rather than shipped as an audio file: it is two sine tones,
+ * and a file would be a network request plus a decode for something the
+ * browser can generate in a few lines.
+ */
+function playChime(ctx: AudioContext) {
+  const now = ctx.currentTime;
+  for (const [i, freq] of [660, 990].entries()) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    // Ramped, not switched: an instant start or stop on a sine wave clicks.
+    const t0 = now + i * 0.1;
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(0.18, t0 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.24);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + 0.26);
+  }
+}
+
+function speak(text: string) {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  // Drop anything queued: a cue from three seconds ago is already stale, and
+  // letting them queue means the voice falls further behind the golfer.
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 1.05;
+  u.pitch = 1;
+  window.speechSynthesis.speak(u);
+}
 
 export function LiveCoach() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -35,11 +76,22 @@ export function LiveCoach() {
   const [view, setView] = useState<CoachView>("face_on");
   const [checks, setChecks] = useState<LiveCheck[]>([]);
   const [cue, setCue] = useState("Step into frame to start");
+  const [audioOn, setAudioOn] = useState(true);
 
   const viewRef = useRef(view);
   useEffect(() => {
     viewRef.current = view;
   }, [view]);
+
+  const audioOnRef = useRef(audioOn);
+  useEffect(() => {
+    audioOnRef.current = audioOn;
+    // Silence anything mid-sentence the moment audio is switched off.
+    if (!audioOn && typeof window !== "undefined") window.speechSynthesis?.cancel();
+  }, [audioOn]);
+
+  const announcerRef = useRef<AnnouncerState>(INITIAL_ANNOUNCER);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   const stop = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -47,6 +99,7 @@ export function LiveCoach() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
+    if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     setRunning(false);
     setStatus("");
   }, []);
@@ -71,6 +124,20 @@ export function LiveCoach() {
 
       setStatus("Loading pose model…");
       const landmarker = await getLandmarker();
+
+      // Created inside the click handler on purpose: browsers only allow an
+      // AudioContext to start from a user gesture, and one created earlier
+      // would be born suspended and stay silent.
+      if (!audioCtxRef.current) {
+        const Ctor =
+          window.AudioContext ??
+          (window as unknown as { webkitAudioContext?: typeof AudioContext })
+            .webkitAudioContext;
+        if (Ctor) audioCtxRef.current = new Ctor();
+      }
+      await audioCtxRef.current?.resume().catch(() => {});
+
+      announcerRef.current = INITIAL_ANNOUNCER;
       setStatus("");
       setRunning(true);
 
@@ -112,7 +179,28 @@ export function LiveCoach() {
           const frame = mediapipeToKeypoints(landmarks[0]!, w, h);
           const next = runLiveChecks(frame, viewRef.current);
           setChecks(next);
-          setCue(primaryCue(next));
+          const nextCue = primaryCue(next);
+          setCue(nextCue);
+
+          // "All good" means every check that could be measured passed —
+          // an unmeasurable one (head position from down-the-line) must not
+          // block the confirmation forever.
+          const known = next.filter((c) => c.status !== "unknown");
+          const allGood = known.length > 0 && known.every((c) => c.status === "good");
+
+          const decision = decideAnnouncement(
+            announcerRef.current,
+            allGood ? null : nextCue,
+            allGood,
+            ts,
+          );
+          announcerRef.current = decision.next;
+
+          if (audioOnRef.current) {
+            if (decision.speak) speak(decision.speak);
+            if (decision.chime && audioCtxRef.current) playChime(audioCtxRef.current);
+          }
+          if (decision.vibrate) navigator.vibrate?.(120);
 
           const byId = new Map(next.map((c) => [c.id, c.status]));
           drawSkeleton(ctx, frame, w, h, byId);
@@ -199,6 +287,19 @@ export function LiveCoach() {
           className="rounded-md bg-[color:var(--fairway)] px-4 py-2 text-sm text-[color:var(--primary-foreground)]"
         >
           {running ? "Stop camera" : "Start camera"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setAudioOn((v) => !v)}
+          aria-pressed={audioOn}
+          className={`rounded-md px-3 py-2 text-sm transition ${
+            audioOn
+              ? "bg-[color:var(--fairway)] text-[color:var(--primary-foreground)]"
+              : "bg-[color:var(--mist)] text-[color:var(--ink-muted)]"
+          }`}
+        >
+          {audioOn ? "🔊 Voice on" : "🔇 Voice off"}
         </button>
 
         <div className="flex gap-1 rounded-lg bg-[color:var(--mist)] p-1 text-xs">
