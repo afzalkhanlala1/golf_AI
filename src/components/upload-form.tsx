@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { upload } from "@vercel/blob/client";
 import { Button } from "@/components/ui/button";
+import { FramingCheck } from "@/components/framing-check";
 import { DEMO_SWINGS, type DemoId } from "@/lib/demos";
 
 type View = "face_on" | "down_the_line";
@@ -212,6 +213,9 @@ export function UploadForm({ userId }: { userId: string }) {
           <li>Native slow-motion at 120fps+ for the most accurate impact read — 30fps minimum accepted</li>
           <li>Clip length about 5–10 seconds, one swing</li>
         </ul>
+        {/* Placed here rather than after the file picker: the point is to
+            catch a bad frame before the golfer goes out and hits one. */}
+        <FramingCheck />
       </section>
 
       <section className="space-y-3">
