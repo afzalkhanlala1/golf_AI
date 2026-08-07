@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatShortDate } from "@/lib/format/date";
 
 type SwingRow = {
   id: string;
@@ -100,10 +101,7 @@ export function VideoSourcePicker({
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {swings.map((s) => {
-              const when = new Date(s.createdAt).toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-              });
+              const when = formatShortDate(s.createdAt);
               const label = [when, s.club, s.view.replace(/_/g, "-")]
                 .filter(Boolean)
                 .join(" · ");

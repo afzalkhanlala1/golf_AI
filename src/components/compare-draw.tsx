@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { formatShortDate } from "@/lib/format/date";
 import {
   angleAt,
   angleFromVertical,
@@ -55,14 +56,7 @@ export function CompareDraw() {
   const rightRef = useRef<HTMLVideoElement>(null);
 
   const label = (s: SwingRow) =>
-    [
-      new Date(s.createdAt).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-      }),
-      s.club,
-      s.view.replace(/_/g, "-"),
-    ]
+    [formatShortDate(s.createdAt), s.club, s.view.replace(/_/g, "-")]
       .filter(Boolean)
       .join(" · ");
 

@@ -4,6 +4,7 @@ import { SegmentationLab } from "@/components/segmentation-lab";
 import { requireUser } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/db";
 import { swings } from "@/lib/db/schema";
+import { formatShortDate } from "@/lib/format/date";
 
 export const metadata = {
   title: "Segmentation lab · Golf AI",
@@ -46,7 +47,7 @@ export default async function SegmentationLabPage() {
         swings={rows.map((r) => ({
           id: r.id,
           blobUrl: r.blobUrl,
-          label: `${(r.club ?? "swing").replace("-", " ")} · ${r.view.replaceAll("_", " ")} · ${r.createdAt.toLocaleDateString()}`,
+          label: `${(r.club ?? "swing").replace("-", " ")} · ${r.view.replaceAll("_", " ")} · ${formatShortDate(r.createdAt)}`,
         }))}
       />
     </main>

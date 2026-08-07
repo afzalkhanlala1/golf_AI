@@ -4,6 +4,7 @@ import { Dashboard } from "@/components/progress-charts";
 import { requireUser } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/db";
 import { swingFaults, swingScores, swings } from "@/lib/db/schema";
+import { formatShortDate } from "@/lib/format/date";
 
 export default async function ProgressPage() {
   const userId = await requireUser();
@@ -66,10 +67,7 @@ export default async function ProgressPage() {
 
   const points = scored.map((row) => {
     const point: Record<string, number | string | null> = {
-      label: row.createdAt.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-      }),
+      label: formatShortDate(row.createdAt),
       overall: row.overall,
     };
     for (const code of topFaultCodes) {

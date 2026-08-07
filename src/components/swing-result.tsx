@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { SwingPlayer } from "@/components/swing-player";
 import { SwingPlayer3D } from "@/components/swing-player-3d";
 import { ClubDeliveryCard } from "@/components/club-delivery-card";
+import { formatShortDate } from "@/lib/format/date";
 
 /**
  * Which body region each TPI fault should light up in the overlay, so a
@@ -112,12 +113,8 @@ export function SwingResult({ id }: { id: string }) {
           )
           .slice(0, 20)
           .map((s) => {
-            const created = s.createdAt ? new Date(String(s.createdAt)) : null;
-            const when = created
-              ? created.toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                })
+            const when = s.createdAt
+              ? formatShortDate(String(s.createdAt))
               : "earlier";
             return {
               id: String(s.id),

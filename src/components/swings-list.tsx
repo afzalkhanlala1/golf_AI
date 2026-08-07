@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { formatDateTime } from "@/lib/format/date";
 
 type SwingRow = {
   id: string;
@@ -62,7 +63,7 @@ export function SwingsList({ initialSwings }: { initialSwings: SwingRow[] }) {
               {(s.club ?? "swing").replace("-", " ")} · {s.view.replaceAll("_", " ")}
             </div>
             <div className="text-sm text-[color:var(--ink-muted)]">
-              {s.createdAt.toLocaleString()}
+              {formatDateTime(s.createdAt)}
             </div>
           </Link>
           <div className="flex shrink-0 items-center gap-2">

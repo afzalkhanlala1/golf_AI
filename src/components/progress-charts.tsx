@@ -16,6 +16,7 @@ import {
   YAxis,
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
+import { formatShortDate } from "@/lib/format/date";
 
 // Fixed categorical order, validated for CVD separation (see dataviz skill).
 // Never reassign — a fault always gets the same slot across renders.
@@ -273,11 +274,7 @@ export function Dashboard({
                     {(s.club ?? "swing").replace("-", " ")} · {s.view.replaceAll("_", " ")}
                   </p>
                   <p className="text-xs text-[color:var(--ink-muted)]">
-                    {s.createdAt.toLocaleDateString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
+                    {formatShortDate(s.createdAt)}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
