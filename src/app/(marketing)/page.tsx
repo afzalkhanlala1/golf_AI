@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { LogoMark } from "@/components/logo-mark";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { MarketingAuthLinks } from "@/components/marketing-auth-links";
+import { isAuthDisabled } from "@/lib/auth-mode";
 
 const STEPS = [
   {
@@ -120,18 +122,7 @@ export default function MarketingHomePage() {
           </Link>
           <nav className="flex items-center gap-3 sm:gap-5">
             <ThemeToggle />
-            <Link
-              href="/sign-in"
-              className="text-[13px] text-[color:var(--muted)] transition hover:text-[color:var(--ink)]"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/upload"
-              className="rounded-[3px] border border-[color:var(--green)] px-3.5 py-2 text-[13px] font-semibold tracking-[0.03em] text-[color:var(--green)] transition hover:bg-[color:var(--green-soft)]"
-            >
-              Upload a swing
-            </Link>
+            <MarketingAuthLinks authDisabled={isAuthDisabled()} />
           </nav>
         </div>
       </header>

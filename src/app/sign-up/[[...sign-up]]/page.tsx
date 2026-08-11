@@ -13,7 +13,9 @@ export default function SignUpPage() {
       title="Upload your first swing in under two minutes."
       subtitle="No card, no in-browser recording — just a slow-motion clip from your phone and a scored, explained swing on the other side."
     >
-      <SignUp appearance={clerkAppearance} />
+      {/* A new account has no swings yet, so the ledger and the overview are
+          both empty — upload is the only screen that does anything for them. */}
+      <SignUp appearance={clerkAppearance} fallbackRedirectUrl="/upload" />
     </AuthShell>
   );
 }

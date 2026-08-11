@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { SignOutButton, useUser } from "@clerk/nextjs";
 
 /**
@@ -50,6 +51,20 @@ function initialsOf(name: string, email: string): string {
 
 function ClerkIdentity({ compact }: { compact: boolean }) {
   const { isLoaded, user } = useUser();
+
+  // Clerk resolved and there is genuinely nobody signed in. The middleware
+  // should have redirected before this renders, so this is a backstop — but
+  // it must not be the loading skeleton, which would sit there grey forever.
+  if (isLoaded && !user) {
+    return (
+      <Link
+        href="/sign-in"
+        className="text-[12.5px] tracking-[0.03em] text-[color:var(--muted)] transition hover:text-[color:var(--ink)]"
+      >
+        Sign in
+      </Link>
+    );
+  }
 
   // Reserve the row before Clerk resolves so the sidebar footer does not
   // jump once the user loads.

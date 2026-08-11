@@ -13,7 +13,11 @@ export default function SignInPage() {
       title="Pick up the swing where you left off."
       subtitle="Your score history, fault trends, and drills are waiting — sign in to see what changed since your last session."
     >
-      <SignIn appearance={clerkAppearance} />
+      {/* `fallback`, not `force`: arriving here from a protected page carries
+          a redirect_url and should return there. This only decides where
+          someone lands when they signed in from the header with no
+          destination in mind — which, left unset, was the marketing page. */}
+      <SignIn appearance={clerkAppearance} fallbackRedirectUrl="/progress" />
     </AuthShell>
   );
 }

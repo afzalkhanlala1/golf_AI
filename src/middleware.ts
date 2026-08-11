@@ -18,11 +18,21 @@ export default async function middleware(
     "/api/health(.*)",
     "/api/swings/(.*)/callback",
   ]);
+  /**
+   * Every room behind the app shell. The shell renders a signed-in identity
+   * and its pages read from `/api/*` routes that all require a session, so a
+   * route left off this list does not become a public demo — it becomes a
+   * page that renders a signed-out sidebar over data it cannot fetch.
+   */
   const isProtectedRoute = createRouteMatcher([
     "/upload(.*)",
     "/swings(.*)",
     "/progress(.*)",
     "/lab(.*)",
+    "/compare(.*)",
+    "/coach(.*)",
+    "/fitting(.*)",
+    "/settings(.*)",
   ]);
 
   return clerkMiddleware(async (auth, request) => {
