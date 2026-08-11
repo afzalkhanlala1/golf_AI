@@ -4,6 +4,11 @@ import { requireUser } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/db";
 import { swings } from "@/lib/db/schema";
 import { SwingsList } from "@/components/swings-list";
+import { PageBody, PageHeader } from "@/components/page-header";
+
+export const metadata = {
+  title: "Swings · Grip Intelligence",
+};
 
 export default async function SwingsPage() {
   const userId = await requireUser();
@@ -17,16 +22,27 @@ export default async function SwingsPage() {
     .orderBy(desc(swings.createdAt))
     .limit(50);
 
-  return (
-    <main className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-      <h1 className="font-[family-name:var(--font-display)] text-4xl text-[color:var(--fairway)]">
-        Your swings
-      </h1>
-      <p className="mt-2 text-[color:var(--ink-muted)]">
-        Newest first. Open any session for score, faults, and drills.
-      </p>
+  const graded = rows.filter((r) => r.status === "COMPLETE").length;
 
-      <SwingsList initialSwings={rows} />
-    </main>
+  return (
+    <PageBody>
+      <PageHeader
+        kicker="The ledger"
+        title={
+          rows.length === 0
+            ? "No swings on record yet."
+            : `${rows.length} ${rows.length === 1 ? "swing" : "swings"} on record.`
+        }
+        accent={
+          rows.length === 0
+            ? "The first one starts the line."
+            : `${graded} graded, newest first.`
+        }
+        lede="Every swing you have sent through the pipeline, whether it graded cleanly or not. Open any one for its phase scores, the faults it triggered, and the metric behind each."
+      />
+      <div className="mt-9">
+        <SwingsList initialSwings={rows} />
+      </div>
+    </PageBody>
   );
 }

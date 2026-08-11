@@ -79,29 +79,21 @@ export function FittingView() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <p className="text-sm uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">
-          Fitting
-        </p>
-        <h1 className="font-[family-name:var(--font-display)] text-4xl">
-          A starting spec, built from your own swings.
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-[color:var(--ink-muted)]">
-          Every line below says what it was calculated from. This is where a
-          fitting conversation starts, not where it ends — nothing replaces
-          hitting real heads on a launch monitor.
-        </p>
-      </div>
+      <p className="max-w-[60ch] text-[12.5px] leading-[1.7] text-[color:var(--muted)]">
+        Every line below says what it was calculated from. This is where a
+        fitting conversation starts, not where it ends — nothing replaces
+        hitting real heads on a launch monitor.
+      </p>
 
       {error && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <div className="border-l-2 border-[color:var(--warn)] bg-[color:var(--sunk)] px-4 py-3 text-sm leading-relaxed text-[color:var(--muted)]">
           {error}
         </div>
       )}
 
       <form
         onSubmit={save}
-        className="rounded-xl border border-[color:var(--line)] p-4"
+        className="rounded-[2px] border border-[color:var(--line)] p-4"
       >
         <h2 className="text-sm uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">
           Your measurements
@@ -141,7 +133,7 @@ export function FittingView() {
 
       {data && (
         <>
-          <section className="rounded-xl border border-[color:var(--line)] p-4">
+          <section className="rounded-[2px] border border-[color:var(--line)] p-4">
             <h2 className="text-sm uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">
               Measured from your swings
             </h2>
@@ -177,7 +169,7 @@ export function FittingView() {
               {data.recommendations.map((r) => (
                 <section
                   key={r.category}
-                  className="rounded-xl border border-[color:var(--line)] p-4"
+                  className="rounded-[2px] border border-[color:var(--line)] p-4"
                 >
                   <div className="flex items-baseline justify-between gap-2">
                     <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">
@@ -208,7 +200,7 @@ export function FittingView() {
           )}
 
           {data.unlocks.length > 0 && (
-            <section className="rounded-xl border border-[color:var(--line)] p-4">
+            <section className="rounded-[2px] border border-[color:var(--line)] p-4">
               <h2 className="text-sm uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">
                 To fit the rest
               </h2>

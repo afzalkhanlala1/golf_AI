@@ -1,25 +1,27 @@
 import { redirect } from "next/navigation";
 import { UploadForm } from "@/components/upload-form";
+import { PageBody, PageHeader } from "@/components/page-header";
 import { requireUser } from "@/lib/auth/current-user";
+
+export const metadata = {
+  title: "Upload · Grip Intelligence",
+};
 
 export default async function UploadPage() {
   const userId = await requireUser();
   if (!userId) redirect("/sign-in");
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
-      <p className="text-sm uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">
-        Upload
-      </p>
-      <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl text-[color:var(--fairway)]">
-        Film slow. Upload once.
-      </h1>
-      <p className="mt-3 max-w-xl text-[color:var(--ink-muted)]">
-        Use your phone&apos;s native slow-motion camera, then send the file here. We never record inside the browser.
-      </p>
-      <div className="mt-10">
+    <PageBody>
+      <PageHeader
+        kicker="Upload"
+        title="Film slow. Upload once."
+        accent="We read the rest."
+        lede="Use your phone's native slow-motion camera, then send the file here. 120fps or higher gives the sharpest read on impact. We never record inside the browser."
+      />
+      <div className="mt-9 max-w-2xl">
         <UploadForm userId={userId} />
       </div>
-    </main>
+    </PageBody>
   );
 }

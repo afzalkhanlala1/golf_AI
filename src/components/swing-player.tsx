@@ -579,7 +579,7 @@ export function SwingPlayer({
 
   return (
     <div className="space-y-3">
-      <div className="relative overflow-hidden rounded-xl bg-black">
+      <div className="relative overflow-hidden rounded-[2px] bg-black">
         <video
           ref={videoRef}
           src={blobUrl}
@@ -635,7 +635,7 @@ export function SwingPlayer({
           {/* One panel rather than a wrapped row of loose buttons: playback
               and overlays are different kinds of control and were reading as
               one undifferentiated strip once the overlay count grew. */}
-          <div className="rounded-xl border border-[color:var(--line)] bg-[color:var(--mist)]/30 p-3">
+          <div className="rounded-[2px] border border-[color:var(--line)] bg-[color:var(--mist)]/30 p-3">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
               <div className="flex items-center gap-2">
                 <span className="text-[11px] uppercase tracking-[0.14em] text-[color:var(--ink-muted)]">

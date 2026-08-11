@@ -1,13 +1,22 @@
 import { LiveCoach } from "@/components/live-coach";
+import { PageBody, PageHeader } from "@/components/page-header";
 
 export const metadata = {
-  title: "Live Coach · Golf AI",
+  title: "Live Coach · Grip Intelligence",
 };
 
 export default function CoachPage() {
   return (
-    <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
-      <LiveCoach />
-    </main>
+    <PageBody>
+      <PageHeader
+        kicker="Live Coach · your camera"
+        title="Setup coaching, before you swing."
+        accent="Nothing leaves the browser."
+        lede="Posture, knee flex, stance width and balance, read from your camera and called out as you stand to the ball. The video is never uploaded and never recorded — the pose runs on your own machine."
+      />
+      <div className="mt-9">
+        <LiveCoach />
+      </div>
+    </PageBody>
   );
 }

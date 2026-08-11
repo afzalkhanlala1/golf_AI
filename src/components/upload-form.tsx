@@ -157,7 +157,7 @@ export function UploadForm({ userId }: { userId: string }) {
               type="button"
               disabled={pending}
               onClick={() => runDemo(d.id)}
-              className="rounded-xl border border-[color:var(--line)] bg-white/80 px-4 py-4 text-left transition hover:border-[color:var(--fairway)] hover:bg-[color:var(--mist)] disabled:opacity-60"
+              className="rounded-[2px] border border-[color:var(--line)] bg-[color:var(--surface)] px-4 py-4 text-left transition hover:border-[color:var(--fairway)] hover:bg-[color:var(--mist)] disabled:opacity-60"
             >
               <div className="text-sm font-medium text-[color:var(--fairway)]">
                 {demoPending === d.id ? "Starting…" : d.title}
@@ -190,10 +190,10 @@ export function UploadForm({ userId }: { userId: string }) {
               key={value}
               type="button"
               onClick={() => setView(value)}
-              className={`rounded-xl border px-4 py-4 text-left transition ${
+              className={`rounded-[2px] border px-4 py-4 text-left transition ${
                 view === value
                   ? "border-[color:var(--fairway)] bg-[color:var(--mist)]"
-                  : "border-[color:var(--line)] bg-white/70 hover:border-[color:var(--fairway-soft)]"
+                  : "border-[color:var(--line)] bg-[color:var(--surface)] hover:border-[color:var(--fairway-soft)]"
               }`}
             >
               <div className="text-sm font-medium text-[color:var(--ink)]">{title}</div>
@@ -224,7 +224,7 @@ export function UploadForm({ userId }: { userId: string }) {
           <select
             value={club}
             onChange={(e) => setClub(e.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-[color:var(--line)] bg-white px-3 py-2 text-sm"
+            className="mt-1.5 w-full rounded-[2px] border border-[color:var(--line)] bg-[color:var(--surface)] px-3 py-2 text-sm"
           >
             <option value="dr">Driver</option>
             <option value="3w">3-wood</option>
@@ -244,7 +244,7 @@ export function UploadForm({ userId }: { userId: string }) {
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="flex w-full flex-col items-center justify-center rounded-xl border border-dashed border-[color:var(--fairway-soft)] bg-white/60 px-4 py-10 text-center"
+          className="flex w-full flex-col items-center justify-center rounded-[2px] border border-dashed border-[color:var(--fairway-soft)] bg-[color:var(--surface)] px-4 py-10 text-center"
         >
           <span className="font-medium text-[color:var(--fairway)]">
             {file ? file.name : "Choose slow-motion video"}
@@ -255,12 +255,12 @@ export function UploadForm({ userId }: { userId: string }) {
         </button>
 
         {fpsEstimate !== null && fpsEstimate < 24 && (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-900">
+          <p className="border-l-2 border-[color:var(--bad)] bg-[color:var(--sunk)] px-3 py-2 text-sm text-[color:var(--bad)]">
             This file looks like ~{fpsEstimate}fps — too low to track a swing at all. Re-film at 30fps or higher.
           </p>
         )}
         {fpsEstimate !== null && fpsEstimate >= 24 && fpsEstimate < 120 && (
-          <p className="rounded-lg bg-[color:var(--sand-soft)] px-3 py-2 text-sm text-[color:var(--ink)]">
+          <p className="rounded-[2px] bg-[color:var(--sand-soft)] px-3 py-2 text-sm text-[color:var(--ink)]">
             This file looks like ~{fpsEstimate}fps. It will be analyzed, but confidence around impact will be reduced — prefer native 120/240fps slow-mo when you can.
           </p>
         )}
@@ -283,7 +283,7 @@ export function UploadForm({ userId }: { userId: string }) {
         </div>
       )}
 
-      {error && <p className="text-sm text-red-700">{error}</p>}
+      {error && <p className="text-sm text-[color:var(--bad)]">{error}</p>}
 
       <Button type="submit" disabled={pending || !file} className="h-10 px-5">
         {pending ? "Uploading…" : "Analyze swing"}

@@ -227,20 +227,7 @@ export function LiveCoach() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">
-          Live Coach
-        </p>
-        <h1 className="font-[family-name:var(--font-display)] text-4xl">
-          Check your setup before you swing.
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-[color:var(--ink-muted)]">
-          Live posture coaching from your camera. Nothing is recorded and no
-          video leaves your device — the pose model runs in this browser tab.
-        </p>
-      </div>
-
-      <div className="rounded-xl border border-[color:var(--line)] bg-[color:var(--mist)]/40 px-4 py-3 text-xs leading-relaxed text-[color:var(--ink-muted)]">
+      <div className="rounded-[2px] border border-[color:var(--line)] bg-[color:var(--mist)]/40 px-4 py-3 text-xs leading-relaxed text-[color:var(--ink-muted)]">
         <strong className="text-[color:var(--ink)]">Setup, not swing.</strong>{" "}
         A webcam runs at about 30fps, and a downswing lasts a quarter of a
         second — roughly seven frames. Live swing numbers from a webcam would
@@ -250,12 +237,12 @@ export function LiveCoach() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <div className="border-l-2 border-[color:var(--warn)] bg-[color:var(--sunk)] px-4 py-3 text-sm leading-relaxed text-[color:var(--muted)]">
           {error}
         </div>
       )}
 
-      <div className="relative overflow-hidden rounded-xl bg-black">
+      <div className="relative overflow-hidden rounded-[2px] bg-black">
         <video
           ref={videoRef}
           playsInline
@@ -302,7 +289,7 @@ export function LiveCoach() {
           {audioOn ? "🔊 Voice on" : "🔇 Voice off"}
         </button>
 
-        <div className="flex gap-1 rounded-lg bg-[color:var(--mist)] p-1 text-xs">
+        <div className="flex gap-1 rounded-[2px] bg-[color:var(--mist)] p-1 text-xs">
           {(
             [
               ["face_on", "Face-on"],
@@ -330,7 +317,7 @@ export function LiveCoach() {
           {checks.map((c) => (
             <div
               key={c.id}
-              className="flex items-center gap-3 rounded-xl border border-[color:var(--line)] p-3"
+              className="flex items-center gap-3 rounded-[2px] border border-[color:var(--line)] p-3"
             >
               <span
                 className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"

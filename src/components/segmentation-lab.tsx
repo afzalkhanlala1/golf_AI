@@ -301,7 +301,7 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
           <select
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
-            className="h-9 rounded-lg border border-[color:var(--line)] bg-white px-3 text-sm"
+            className="h-9 rounded-[2px] border border-[color:var(--line)] bg-[color:var(--surface)] px-3 text-sm"
           >
             {swings.map((s) => (
               <option key={s.id} value={s.id}>
@@ -314,7 +314,7 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
 
       {mode === "upload" && (
         <div className="space-y-3">
-          <div className="rounded-xl border border-dashed border-[color:var(--fairway-soft)] bg-white/60 p-5">
+          <div className="rounded-[2px] border border-dashed border-[color:var(--fairway-soft)] bg-[color:var(--surface)] p-5">
             <p className="mb-3 font-medium text-[color:var(--fairway)]">
               {uploadName ?? "Choose a video to segment"}
             </p>
@@ -340,7 +340,7 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
           )}
 
           {lowRes && (
-            <p className="rounded-lg bg-[color:var(--sand-soft)] px-3 py-2 text-sm text-[color:var(--ink)]">
+            <p className="rounded-[2px] bg-[color:var(--sand-soft)] px-3 py-2 text-sm text-[color:var(--ink)]">
               This clip is {lowRes.w}×{lowRes.h}. Pose at that size is coarse,
               so regions will look rough — fine for checking the plumbing, not
               for judging accuracy. (The GolfDB Kaggle mirror is 160×160 for
@@ -350,7 +350,7 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
           )}
 
           {missed != null && missed > 0 && frames && missed < frames.length && (
-            <p className="rounded-lg bg-[color:var(--sand-soft)] px-3 py-2 text-sm text-[color:var(--ink)]">
+            <p className="rounded-[2px] bg-[color:var(--sand-soft)] px-3 py-2 text-sm text-[color:var(--ink)]">
               No person found in {missed} of {frames.length} frames — those gaps
               render empty.
             </p>
@@ -359,20 +359,20 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
       )}
 
       {swings.length === 0 && mode === "swing" && (
-        <p className="rounded-xl border border-[color:var(--line)] bg-white/70 px-4 py-3 text-sm text-[color:var(--ink-muted)]">
+        <p className="rounded-[2px] border border-[color:var(--line)] bg-[color:var(--surface)] px-4 py-3 text-sm text-[color:var(--ink-muted)]">
           No analyzed swings with stored keypoints yet.
         </p>
       )}
 
       {error && (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+        <p className="border-l-2 border-[color:var(--bad)] bg-[color:var(--sunk)] px-4 py-3 text-sm leading-relaxed text-[color:var(--bad)]">
           {error}
         </p>
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
         <div className="space-y-3">
-          <div className="relative overflow-hidden rounded-2xl border border-[color:var(--line)] bg-black">
+          <div className="relative overflow-hidden rounded-[2px] border border-[color:var(--line)] bg-black">
             {videoSrc ? (
               <video
                 ref={videoRef}
@@ -492,7 +492,7 @@ export function SegmentationLab({ swings }: { swings: SwingOption[] }) {
             </ul>
           )}
 
-          <div className="rounded-xl border border-[color:var(--line)] bg-white/70 px-4 py-3 text-xs leading-relaxed text-[color:var(--ink-muted)]">
+          <div className="rounded-[2px] border border-[color:var(--line)] bg-[color:var(--surface)] px-4 py-3 text-xs leading-relaxed text-[color:var(--ink-muted)]">
             <p className="font-medium text-[color:var(--ink)]">How this works</p>
             <p className="mt-1">
               Regions are derived geometrically from pose keypoints — no separate

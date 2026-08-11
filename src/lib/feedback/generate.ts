@@ -39,7 +39,7 @@ function templateFeedback(findings: FindingsPayload): FeedbackOutput {
     return {
       headline: "Solid foundation — keep building consistency",
       primaryFault: "none",
-      whatIsHappening: `Your overall score is ${findings.overall}. ${bestPhase ? `Your strongest phase is ${bestPhase[0]} at ${bestPhase[1]}.` : ""}`,
+      whatIsHappening: `Your overall score is ${Math.round(findings.overall)}. ${bestPhase ? `Your strongest phase is ${bestPhase[0]} at ${Math.round(bestPhase[1])}.` : ""}`,
       whyItMatters:
         "Repeating this pattern under slight pressure will lock in the gains.",
       drills: [
@@ -56,7 +56,7 @@ function templateFeedback(findings: FindingsPayload): FeedbackOutput {
   return {
     headline: `Let's tame your ${primary.code.replaceAll("_", " ")}`,
     primaryFault: primary.code,
-    whatIsHappening: `We measured ${primary.code.replaceAll("_", " ")} at severity ${primary.severity.toFixed(2)} in the ${primary.phase}. Your overall score is ${findings.overall}.`,
+    whatIsHappening: `We measured ${primary.code.replaceAll("_", " ")} at severity ${primary.severity.toFixed(2)} in the ${primary.phase}. Your overall score is ${Math.round(findings.overall)}.`,
     whyItMatters:
       "Fixing this one pattern usually frees up contact and balance without stacking swing thoughts.",
     drills: [

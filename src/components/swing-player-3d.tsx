@@ -214,7 +214,7 @@ export function SwingPlayer3D({
 
   if (error) {
     return (
-      <div className="rounded-xl border border-[color:var(--line)] p-6 text-sm text-[color:var(--ink-muted)]">
+      <div className="rounded-[2px] border border-[color:var(--line)] p-6 text-sm text-[color:var(--ink-muted)]">
         3D playback unavailable — {error}
       </div>
     );
@@ -222,7 +222,7 @@ export function SwingPlayer3D({
 
   if (!primary) {
     return (
-      <div className="flex h-[420px] items-center justify-center rounded-xl bg-[color:var(--mist)] text-sm text-[color:var(--ink-muted)]">
+      <div className="flex h-[420px] items-center justify-center rounded-[2px] bg-[color:var(--mist)] text-sm text-[color:var(--ink-muted)]">
         Loading 3D skeleton…
       </div>
     );
@@ -233,7 +233,7 @@ export function SwingPlayer3D({
 
   return (
     <div className="space-y-3">
-      <div className="relative overflow-hidden rounded-xl bg-[#0b0f0d]">
+      <div className="relative overflow-hidden rounded-[2px] bg-[#0b0f0d]">
         <canvas
           ref={canvasRef}
           onPointerDown={onPointerDown}

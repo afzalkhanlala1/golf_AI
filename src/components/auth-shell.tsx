@@ -1,10 +1,20 @@
 import Link from "next/link";
+import { LogoMark } from "@/components/logo-mark";
 
 const TRUST_POINTS = [
   "Every score shows the metric that drove it — nothing hidden behind a modal.",
   "Faults are named against the TPI Big 12 — the vocabulary coaches already use.",
   "The feedback engine explains measured numbers. It never invents one.",
 ];
+
+/**
+ * The left panel stays dark in both themes, the way the phone splash does.
+ * Re-tinting it per theme would mean two sets of contrast to keep honest for
+ * no gain — it reads as the cover of the product either way.
+ */
+const PANEL = "#0f1a14";
+const PANEL_INK = "#f2f5f2";
+const PANEL_MUTED = "#9fb3a6";
 
 export function AuthShell({
   eyebrow,
@@ -21,75 +31,90 @@ export function AuthShell({
 }) {
   return (
     <main className="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
-      <section className="relative hidden overflow-hidden bg-[color:var(--fairway)] px-14 py-16 lg:flex lg:flex-col lg:justify-between">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-70"
-          style={{
-            background:
-              "radial-gradient(ellipse 60% 50% at 15% 10%, rgba(207,224,212,0.28) 0%, transparent 60%), radial-gradient(ellipse 50% 40% at 100% 100%, rgba(166,124,82,0.22) 0%, transparent 55%)",
-          }}
-        />
-        <svg
-          aria-hidden
-          viewBox="0 0 400 400"
-          className="pointer-events-none absolute -right-24 -bottom-24 h-[520px] w-[520px] opacity-[0.14]"
-          fill="none"
-        >
-          <path
-            d="M40 340 C 120 340, 120 220, 200 200 C 300 175, 260 40, 360 40"
-            stroke="#f3f6f2"
-            strokeWidth="1.5"
-            strokeDasharray="2 10"
-            strokeLinecap="round"
-          />
-          <circle cx="360" cy="40" r="5" fill="#f3f6f2" />
-        </svg>
-
-        <Link
-          href="/"
-          className="relative font-[family-name:var(--font-display)] text-xl tracking-tight text-[#f3f6f2]"
-        >
-          Golf AI
+      <section
+        className="relative hidden overflow-hidden px-14 py-16 lg:flex lg:flex-col lg:justify-between"
+        style={{ background: PANEL }}
+      >
+        <Link href="/" className="relative flex items-center gap-3">
+          {/* The crest reads its colours from CSS vars; inside this always-dark
+              panel they are pinned so it does not follow the page theme. */}
+          <span
+            style={
+              {
+                "--green": "#3fbf7a",
+                "--ink": PANEL_INK,
+                "--surface": PANEL,
+                "--none": "#5c6f63",
+              } as React.CSSProperties
+            }
+            className="inline-flex"
+          >
+            <LogoMark size={40} animate />
+          </span>
+          <span
+            className="gi-display text-[20px] font-semibold"
+            style={{ color: PANEL_INK }}
+          >
+            Grip Intelligence
+          </span>
         </Link>
 
         <div className="relative max-w-md">
-          <p className="text-sm font-medium tracking-[0.22em] text-[#cfe0d4] uppercase">
+          <p
+            className="text-[10px] tracking-[0.2em] uppercase"
+            style={{ color: PANEL_MUTED }}
+          >
             {eyebrow}
           </p>
-          <h1 className="mt-4 font-[family-name:var(--font-display)] text-4xl leading-[1.08] text-[#f7fbf8] xl:text-[2.75rem]">
+          <h1
+            className="gi-display mt-4 text-[2.5rem] leading-[1.06] xl:text-[2.75rem]"
+            style={{ color: PANEL_INK }}
+          >
             {title}
           </h1>
-          <p className="mt-5 text-[15px] leading-relaxed text-[#cfe0d4]">
+          <p
+            className="mt-5 text-[13.5px] leading-[1.7]"
+            style={{ color: PANEL_MUTED }}
+          >
             {subtitle}
           </p>
 
-          <ul className="mt-10 space-y-4 border-t border-white/15 pt-8">
+          <ul
+            className="mt-10 space-y-4 border-t pt-8"
+            style={{ borderColor: "rgba(255,255,255,0.12)" }}
+          >
             {TRUST_POINTS.map((point) => (
-              <li key={point} className="flex gap-3 text-sm text-[#dfe9e2]">
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--sand)]" />
-                <span className="leading-relaxed">{point}</span>
+              <li
+                key={point}
+                className="flex gap-3 text-[12.5px] leading-[1.7]"
+                style={{ color: PANEL_MUTED }}
+              >
+                <span
+                  className="mt-1.5 h-1 w-1 shrink-0 rounded-full"
+                  style={{ background: "#3fbf7a" }}
+                />
+                <span>{point}</span>
               </li>
             ))}
           </ul>
         </div>
 
-        <p className="relative text-xs text-[#9fb6a8]">
+        <p className="relative text-[11px]" style={{ color: PANEL_MUTED }}>
           Upload-only — we never record inside the browser.
         </p>
       </section>
 
-      <section className="flex flex-col items-center justify-center px-6 py-16 sm:px-10">
+      <section className="flex flex-col items-center justify-center bg-[color:var(--paper)] px-6 py-16 sm:px-10">
         <div className="w-full max-w-sm">
-          <Link
-            href="/"
-            className="mb-8 inline-block font-[family-name:var(--font-display)] text-lg tracking-tight text-[color:var(--fairway)] lg:hidden"
-          >
-            Golf AI
+          <Link href="/" className="mb-8 flex items-center gap-2.5 lg:hidden">
+            <LogoMark size={30} />
+            <span className="gi-display text-[18px] font-semibold">
+              Grip Intelligence
+            </span>
           </Link>
           {children}
           {footer && (
-            <p className="mt-6 text-center text-sm text-[color:var(--ink-muted)]">
+            <p className="mt-6 text-center text-[12.5px] text-[color:var(--muted)]">
               {footer}
             </p>
           )}
@@ -99,24 +124,31 @@ export function AuthShell({
   );
 }
 
+/**
+ * Clerk's widget is themed through CSS variables rather than fixed hex, so it
+ * follows the light/dark toggle with the rest of the app instead of staying
+ * on a white card when everything around it goes dark.
+ */
 export const clerkAppearance = {
   variables: {
-    colorPrimary: "#0f3d2e",
-    colorText: "#14201a",
-    colorTextSecondary: "#5b6b61",
-    colorBackground: "#ffffff",
-    colorInputBackground: "#ffffff",
-    colorInputText: "#14201a",
-    borderRadius: "0.75rem",
+    colorPrimary: "var(--green)",
+    colorText: "var(--ink)",
+    colorTextSecondary: "var(--muted)",
+    colorBackground: "var(--surface)",
+    colorInputBackground: "var(--surface)",
+    colorInputText: "var(--ink)",
+    colorNeutral: "var(--ink)",
+    borderRadius: "3px",
     fontFamily: "var(--font-sans-body)",
   },
   elements: {
-    card: "shadow-none ring-1 ring-[color:var(--line)] rounded-2xl",
-    headerTitle: "font-[family-name:var(--font-display)] text-2xl text-[color:var(--fairway)]",
-    headerSubtitle: "text-[color:var(--ink-muted)]",
+    card: "shadow-none ring-1 ring-[color:var(--rule)] rounded-[3px] bg-[color:var(--surface)]",
+    headerTitle: "font-[family-name:var(--font-display)] text-2xl text-[color:var(--ink)]",
+    headerSubtitle: "text-[color:var(--muted)]",
     formButtonPrimary:
-      "bg-[color:var(--fairway)] hover:bg-[color:var(--fairway-soft)] text-sm normal-case",
-    footerActionLink: "text-[color:var(--fairway)] hover:text-[color:var(--fairway-soft)]",
-    socialButtonsBlockButton: "border-[color:var(--line)]",
+      "bg-[color:var(--green)] text-[color:var(--primary-foreground)] hover:opacity-90 text-sm normal-case rounded-[3px]",
+    footerActionLink: "text-[color:var(--green)] hover:opacity-80",
+    socialButtonsBlockButton:
+      "border-[color:var(--rule-strong)] text-[color:var(--ink)] rounded-[3px]",
   },
 } as const;

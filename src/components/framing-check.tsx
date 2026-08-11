@@ -183,7 +183,7 @@ export function FramingCheck() {
   }
 
   return (
-    <div className="space-y-3 rounded-xl border border-[color:var(--line)] p-4">
+    <div className="space-y-3 rounded-[2px] border border-[color:var(--line)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium">Framing check</p>
@@ -202,12 +202,12 @@ export function FramingCheck() {
       </div>
 
       {error && (
-        <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+        <p className="border-l-2 border-[color:var(--warn)] bg-[color:var(--sunk)] px-3 py-2 text-xs leading-relaxed text-[color:var(--muted)]">
           {error}
         </p>
       )}
 
-      <div className="relative overflow-hidden rounded-lg bg-black">
+      <div className="relative overflow-hidden rounded-[2px] bg-black">
         <video ref={videoRef} playsInline muted className="block max-h-[360px] w-full object-contain" />
         <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full object-contain" />
 

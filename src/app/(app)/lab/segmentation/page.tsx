@@ -1,13 +1,14 @@
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { SegmentationLab } from "@/components/segmentation-lab";
+import { PageBody, PageHeader } from "@/components/page-header";
 import { requireUser } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/db";
 import { swings } from "@/lib/db/schema";
 import { formatShortDate } from "@/lib/format/date";
 
 export const metadata = {
-  title: "Segmentation lab · Golf AI",
+  title: "Segmentation lab · Grip Intelligence",
 };
 
 export default async function SegmentationLabPage() {
@@ -29,27 +30,22 @@ export default async function SegmentationLabPage() {
     .limit(25);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-      <p className="text-sm uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">
-        Lab · experimental
-      </p>
-      <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl text-[color:var(--fairway)]">
-        Body-part segmentation
-      </h1>
-      <p className="mt-3 max-w-2xl text-[color:var(--ink-muted)]">
-        Splits the golfer into named regions — head, back, hips, arms, legs —
-        so you can see which part is moving, and when. Regions come from the
-        same pose the swing analysis uses, so what you see here is what the
-        metrics are reading.
-      </p>
-
-      <SegmentationLab
-        swings={rows.map((r) => ({
-          id: r.id,
-          blobUrl: r.blobUrl,
-          label: `${(r.club ?? "swing").replace("-", " ")} · ${r.view.replaceAll("_", " ")} · ${formatShortDate(r.createdAt)}`,
-        }))}
+    <PageBody wide>
+      <PageHeader
+        kicker="The lab · experimental"
+        title="Body-part segmentation."
+        accent="Which part moved, and when."
+        lede="Splits the golfer into named regions — head, back, hips, arms, legs. The regions come from the same pose the swing analysis reads, so what you see here is what the metrics saw."
       />
-    </main>
+      <div className="mt-9">
+        <SegmentationLab
+          swings={rows.map((r) => ({
+            id: r.id,
+            blobUrl: r.blobUrl,
+            label: `${(r.club ?? "swing").replace("-", " ")} · ${r.view.replaceAll("_", " ")} · ${formatShortDate(r.createdAt)}`,
+          }))}
+        />
+      </div>
+    </PageBody>
   );
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { LogoMark } from "@/components/logo-mark";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const STEPS = [
   {
@@ -15,7 +16,7 @@ const STEPS = [
   {
     n: "03",
     title: "Pose + events run",
-    body: "RTMPose tracks 17 body points across all eight GolfDB swing events, address to finish.",
+    body: "Pose tracks the body across all eight swing events, address through finish.",
   },
   {
     n: "04",
@@ -39,9 +40,9 @@ const FEATURES = [
   },
   {
     title: "Ghost comparison",
-    body: "Overlay any two of your swings. Both are scaled to the same torso length and lined up on their shared events, so you compare shape and timing rather than height and clip length.",
+    body: "Overlay any two swings. Both are scaled to the same torso length and lined up on their shared events, so you compare shape and timing rather than height and clip length.",
     needs: "Two analysed swings",
-    href: "/swings",
+    href: "/compare",
   },
   {
     title: "Clubhead & ball speed",
@@ -50,10 +51,16 @@ const FEATURES = [
     href: "/upload",
   },
   {
-    title: "Swing tracer",
-    body: "The clubhead path drawn on your video, cool at the top and hot through impact, so the shape of your plane is readable in a single frame.",
+    title: "Swing tracer & plane",
+    body: "The clubhead path drawn on your video, cool at the top and hot through impact, with the downswing plane fitted over it — the shape of your swing readable in one frame.",
     needs: "60fps+",
     href: "/upload",
+  },
+  {
+    title: "Compare & draw",
+    body: "Two clips side by side, synced on their events, with lines, angles and freehand you can draw straight onto the frame and undo.",
+    needs: "Two analysed swings",
+    href: "/compare",
   },
   {
     title: "Live Coach",
@@ -66,6 +73,18 @@ const FEATURES = [
     body: "Shaft flex, driver loft, club length, iron head and ball, each built from your measured swing and your own measurements — and each labelled with what it was derived from.",
     needs: "Your height and handicap",
     href: "/fitting",
+  },
+  {
+    title: "Body-part segmentation",
+    body: "Splits the golfer into named regions — head, back, hips, arms, legs — so you can see which part is moving and when, from the same pose the metrics read.",
+    needs: "Any analysed swing",
+    href: "/lab/segmentation",
+  },
+  {
+    title: "Clip conditioning",
+    body: "Measures what your camera actually gave us, then sharpens soft footage and fills intermediate frames — labelling every synthetic frame as synthetic.",
+    needs: "Any clip",
+    href: "/lab/preprocess",
   },
 ];
 
@@ -80,7 +99,7 @@ const TRUST_CARDS = [
   },
   {
     title: "The LLM explains. It never measures.",
-    body: "Coaching text is generated from structured findings only, then validated so it can't cite a number that wasn't actually measured.",
+    body: "Coaching text is generated from structured findings only, then validated so it cannot cite a number that was not actually measured.",
   },
   {
     title: "Honest about the camera",
@@ -90,223 +109,248 @@ const TRUST_CARDS = [
 
 export default function MarketingHomePage() {
   return (
-    <main className="relative overflow-hidden">
-      <div className="absolute inset-x-0 top-0 -z-10 h-[70vh] bg-[radial-gradient(ellipse_at_top,_#cfe0d4_0%,_transparent_60%)]" />
-
-      <section className="mx-auto grid w-full max-w-6xl gap-12 px-6 pt-20 pb-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:pt-28">
-        <div>
-          <p className="animate-fade-up text-sm font-medium tracking-[0.22em] text-[color:var(--sand)] uppercase">
-            Slow-motion swing lab
-          </p>
-          <h1
-            className="animate-fade-up mt-4 max-w-xl font-[family-name:var(--font-display)] text-5xl leading-[1.05] tracking-tight text-[color:var(--fairway)] sm:text-6xl"
-            style={{ animationDelay: "80ms" }}
-          >
-            Read your swing like a coach would.
-          </h1>
-          <p
-            className="animate-fade-up mt-5 max-w-lg text-lg text-[color:var(--ink-muted)]"
-            style={{ animationDelay: "160ms" }}
-          >
-            Upload a phone slow-mo clip. Get a phase-scored swing, TPI faults
-            with receipts, and coaching that can only cite measured numbers —
-            never an invented one.
-          </p>
-          <div
-            className="animate-fade-up mt-8 flex flex-wrap gap-3"
-            style={{ animationDelay: "240ms" }}
-          >
-            <Button asChild className="h-11 px-6 text-[15px]">
-              <Link href="/upload">Upload a swing</Link>
-            </Button>
-            <Button asChild variant="outline" className="h-11 px-6 text-[15px]">
-              <Link href="/sign-in">Sign in</Link>
-            </Button>
-          </div>
-          <p
-            className="animate-fade-up mt-4 text-sm text-[color:var(--ink-muted)]"
-            style={{ animationDelay: "300ms" }}
-          >
-            No card required. Two demo swings run the full pipeline in ~6 seconds.
-          </p>
+    <div className="min-h-screen bg-[color:var(--paper)]">
+      <header className="sticky top-0 z-30 border-b border-[color:var(--rule)] bg-[color:var(--surface)]/90 backdrop-blur-md">
+        <div className="mx-auto flex max-w-[1120px] items-center justify-between gap-4 px-5 py-3.5 sm:px-8">
+          <Link href="/" className="flex min-w-0 items-center gap-2.5">
+            <LogoMark size={34} />
+            <span className="gi-display truncate text-[19px] font-semibold">
+              Grip Intelligence
+            </span>
+          </Link>
+          <nav className="flex items-center gap-3 sm:gap-5">
+            <ThemeToggle />
+            <Link
+              href="/sign-in"
+              className="text-[13px] text-[color:var(--muted)] transition hover:text-[color:var(--ink)]"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/upload"
+              className="rounded-[3px] border border-[color:var(--green)] px-3.5 py-2 text-[13px] font-semibold tracking-[0.03em] text-[color:var(--green)] transition hover:bg-[color:var(--green-soft)]"
+            >
+              Upload a swing
+            </Link>
+          </nav>
         </div>
+      </header>
 
-        <div
-          className="animate-fade-up relative mx-auto w-full max-w-sm lg:mx-0"
-          style={{ animationDelay: "180ms" }}
-        >
-          <div className="absolute -inset-4 -z-10 rounded-[2rem] bg-[color:var(--fairway)]/[0.06] blur-2xl" />
-          <div className="rounded-2xl border border-[color:var(--line)] bg-white/90 p-6 shadow-[0_24px_60px_-24px_rgba(15,61,46,0.35)] backdrop-blur">
-            <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">
-                Swing score
-              </p>
-              <span className="rounded-full bg-[color:var(--mist)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--fairway)]">
-                7-iron · face-on
-              </span>
-            </div>
-            <p className="mt-1 font-[family-name:var(--font-display)] text-6xl leading-none text-[color:var(--fairway)]">
-              78
+      <main className="mx-auto max-w-[1120px] px-5 sm:px-8">
+        {/* ── Hero ─────────────────────────────────────────────────────── */}
+        <section className="grid gap-12 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-24">
+          <div className="animate-rise">
+            <p className="gi-kicker">Slow-motion swing lab</p>
+            <h1 className="gi-title text-[clamp(2.4rem,6vw,3.6rem)]">
+              Read your swing like a coach would.
+            </h1>
+            <p className="gi-lede max-w-[44ch] text-[15px]">
+              Upload a phone slow-mo clip. Get a phase-scored swing, TPI faults
+              with receipts, and coaching that can only cite measured numbers —
+              never an invented one.
             </p>
-
-            <div className="mt-5 space-y-2.5">
-              {[
-                ["Setup", 88],
-                ["Downswing", 61],
-                ["Impact", 74],
-              ].map(([label, value]) => (
-                <div key={label as string}>
-                  <div className="mb-1 flex justify-between text-xs text-[color:var(--ink-muted)]">
-                    <span>{label}</span>
-                    <span className="tabular-nums">{value}</span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-[color:var(--mist)]">
-                    <div
-                      className="h-full rounded-full bg-[color:var(--fairway)]"
-                      style={{ width: `${value}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Link
+                href="/upload"
+                className="rounded-[3px] bg-[color:var(--green)] px-6 py-3 text-[14px] font-semibold tracking-[0.03em] text-[color:var(--primary-foreground)] transition hover:opacity-90"
+              >
+                Upload a swing
+              </Link>
+              <Link
+                href="/sign-in"
+                className="rounded-[3px] border border-[color:var(--rule-strong)] px-6 py-3 text-[14px] tracking-[0.03em] transition hover:border-[color:var(--green)] hover:text-[color:var(--green)]"
+              >
+                Sign in
+              </Link>
             </div>
+            <p className="mt-4 text-[12px] text-[color:var(--faint)]">
+              No card required. Two demo swings run the full pipeline in ~6
+              seconds.
+            </p>
+          </div>
 
-            <div className="mt-5 rounded-xl border border-[color:var(--sand)]/40 bg-[color:var(--sand-soft)]/50 px-3.5 py-3">
-              <p className="text-xs font-medium tracking-wide text-[color:var(--fairway)] uppercase">
+          {/* The crest, swinging. */}
+          <div
+            className="animate-rise flex flex-col items-center justify-center"
+            style={{ animationDelay: "140ms" }}
+          >
+            <LogoMark size={280} animate />
+            <p className="gi-display mt-8 text-[28px] font-medium">
+              Grip Intelligence
+            </p>
+            <p className="mt-2 text-[9.5px] tracking-[0.28em] text-[color:var(--faint)] uppercase">
+              AI Golfing Coach · Est. MMXXIV
+            </p>
+          </div>
+        </section>
+
+        {/* ── Sample reading ───────────────────────────────────────────── */}
+        <section
+          className="animate-rise grid gap-8 border-t border-b border-[color:var(--rule)] py-8 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center sm:gap-[34px]"
+          style={{ animationDelay: "80ms", borderTopColor: "var(--rule-strong)" }}
+        >
+          <div>
+            <p className="gi-kicker">Swing score · sample</p>
+            <p className="gi-figure mt-2 text-[76px]">78</p>
+            <p className="mt-3 text-[12px] text-[color:var(--muted)]">
+              7-iron · face-on · 8 of 10 checks
+            </p>
+          </div>
+          <div>
+            {[
+              ["Setup", 88],
+              ["Downswing", 61],
+              ["Impact", 74],
+            ].map(([label, value]) => (
+              <div
+                key={label as string}
+                className="flex items-center gap-4 border-b border-[color:var(--rule)] py-3 last:border-0"
+              >
+                <span className="flex-1 text-[13px]">{label}</span>
+                <span className="relative block h-[3px] w-[90px] bg-[color:var(--rule)] sm:w-[160px]">
+                  <span
+                    className="absolute inset-y-0 left-0"
+                    style={{
+                      width: `${value}%`,
+                      background:
+                        (value as number) >= 75 ? "var(--green)" : "var(--warn)",
+                    }}
+                  />
+                </span>
+                <span className="w-8 text-right text-[12px] tabular-nums text-[color:var(--muted)]">
+                  {value}
+                </span>
+              </div>
+            ))}
+            <div className="mt-5 border-l border-[color:var(--green-line)] pl-4">
+              <p className="gi-kicker" style={{ color: "var(--green)" }}>
                 Primary focus · early extension
               </p>
-              <p className="mt-1 text-[13px] leading-relaxed text-[color:var(--ink)]">
+              <p className="mt-2 text-[12.5px] leading-[1.7] text-[color:var(--muted)]">
                 Hips move 0.18 toward the ball in the downswing — target under
                 0.05. Detected from hip depth + spine angle change.
               </p>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="border-y border-[color:var(--line)] bg-white/50 py-20">
-        <div className="mx-auto max-w-6xl px-6">
-          <p className="text-sm font-medium tracking-[0.22em] text-[color:var(--sand)] uppercase">
-            How it works
-          </p>
-          <h2 className="mt-3 max-w-xl font-[family-name:var(--font-display)] text-3xl text-[color:var(--fairway)] sm:text-4xl">
+        {/* ── How it works ─────────────────────────────────────────────── */}
+        <section className="py-16 lg:py-20">
+          <p className="gi-kicker">How it works</p>
+          <h2 className="gi-title max-w-[20ch] text-[clamp(1.7rem,3.4vw,2.4rem)]">
             Four steps between your phone and a coaching note.
           </h2>
-
-          <div className="mt-12 grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-12 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
             {STEPS.map((step) => (
-              <div key={step.n} className="relative">
-                <span className="font-[family-name:var(--font-display)] text-4xl text-[color:var(--fairway)]/15">
+              <div key={step.n} className="border-t border-[color:var(--rule)] pt-5">
+                <span className="gi-figure text-[34px] text-[color:var(--rule-strong)]">
                   {step.n}
                 </span>
-                <h3 className="mt-2 text-lg font-medium text-[color:var(--fairway)]">
+                <h3 className="gi-display mt-2 text-[19px] font-medium">
                   {step.title}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-[color:var(--ink-muted)]">
+                <p className="mt-2 text-[12.5px] leading-[1.7] text-[color:var(--muted)]">
                   {step.body}
                 </p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="mx-auto max-w-6xl px-6 py-20">
-        <p className="text-sm font-medium tracking-[0.22em] text-[color:var(--sand)] uppercase">
-          What you get
-        </p>
-        <h2 className="mt-3 max-w-xl font-[family-name:var(--font-display)] text-3xl text-[color:var(--fairway)] sm:text-4xl">
-          Six things, and what each one needs from your camera.
-        </h2>
-
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((f) => (
-            <Link
-              key={f.title}
-              href={f.href}
-              className="group flex flex-col rounded-2xl border border-[color:var(--line)] bg-white/70 p-6 transition hover:border-[color:var(--fairway-soft)] hover:bg-white"
-            >
-              <h3 className="font-[family-name:var(--font-display)] text-xl text-[color:var(--fairway)]">
-                {f.title}
-              </h3>
-              <p className="mt-2 flex-1 text-[15px] leading-relaxed text-[color:var(--ink-muted)]">
-                {f.body}
-              </p>
-              <p className="mt-4 text-xs tracking-wide text-[color:var(--sand)] uppercase">
-                Needs: {f.needs}
-              </p>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-6xl px-6 py-20">
-        <p className="text-sm font-medium tracking-[0.22em] text-[color:var(--sand)] uppercase">
-          Why trust the number
-        </p>
-        <h2 className="mt-3 max-w-xl font-[family-name:var(--font-display)] text-3xl text-[color:var(--fairway)] sm:text-4xl">
-          Most swing apps show you confidence. We show you our work.
-        </h2>
-
-        <div className="mt-12 grid gap-5 sm:grid-cols-2">
-          {TRUST_CARDS.map((card) => (
-            <div
-              key={card.title}
-              className="rounded-2xl border border-[color:var(--line)] bg-white/70 p-6 transition hover:border-[color:var(--fairway-soft)] hover:bg-white"
-            >
-              <h3 className="font-[family-name:var(--font-display)] text-xl text-[color:var(--fairway)]">
-                {card.title}
-              </h3>
-              <p className="mt-2 text-[15px] leading-relaxed text-[color:var(--ink-muted)]">
-                {card.body}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-6xl px-6 pb-24">
-        <div className="relative overflow-hidden rounded-[2rem] bg-[color:var(--fairway)] px-8 py-14 text-center sm:px-16">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 opacity-70"
-            style={{
-              background:
-                "radial-gradient(ellipse 60% 60% at 20% 0%, rgba(207,224,212,0.25) 0%, transparent 60%), radial-gradient(ellipse 50% 50% at 100% 100%, rgba(166,124,82,0.2) 0%, transparent 55%)",
-            }}
-          />
-          <h2 className="relative font-[family-name:var(--font-display)] text-3xl text-[#f7fbf8] sm:text-4xl">
-            Bring one swing. Leave with one thing to work on.
+        {/* ── Features ─────────────────────────────────────────────────── */}
+        <section className="py-16 lg:py-20">
+          <p className="gi-kicker">What you get</p>
+          <h2 className="gi-title max-w-[24ch] text-[clamp(1.7rem,3.4vw,2.4rem)]">
+            Nine rooms, and what each one needs from your camera.
           </h2>
-          <p className="relative mx-auto mt-4 max-w-lg text-[15px] text-[#cfe0d4]">
+          <div className="mt-12 grid gap-px bg-[color:var(--rule)] sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map((f) => (
+              <Link
+                key={f.title}
+                href={f.href}
+                className="group flex flex-col bg-[color:var(--paper)] p-6 transition hover:bg-[color:var(--surface)]"
+              >
+                <h3 className="gi-display text-[20px] font-medium transition group-hover:text-[color:var(--green)]">
+                  {f.title}
+                </h3>
+                <p className="mt-2.5 flex-1 text-[12.5px] leading-[1.7] text-[color:var(--muted)]">
+                  {f.body}
+                </p>
+                <p className="mt-5 text-[9.5px] tracking-[0.16em] text-[color:var(--faint)] uppercase">
+                  Needs: {f.needs}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* ── Trust ────────────────────────────────────────────────────── */}
+        <section className="py-16 lg:py-20">
+          <p className="gi-kicker">Why trust the number</p>
+          <h2 className="gi-title max-w-[24ch] text-[clamp(1.7rem,3.4vw,2.4rem)]">
+            Most swing apps show you confidence.
+            <br />
+            <span className="text-[color:var(--muted)]">We show you our work.</span>
+          </h2>
+          <div className="mt-12 grid gap-x-10 gap-y-9 sm:grid-cols-2">
+            {TRUST_CARDS.map((card) => (
+              <div
+                key={card.title}
+                className="border-t border-[color:var(--rule)] pt-5"
+              >
+                <h3 className="gi-display text-[20px] font-medium">{card.title}</h3>
+                <p className="mt-2.5 text-[12.5px] leading-[1.7] text-[color:var(--muted)]">
+                  {card.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── Close ────────────────────────────────────────────────────── */}
+        <section className="border-t border-[color:var(--rule-strong)] py-16 text-center lg:py-24">
+          <h2 className="gi-title mx-auto max-w-[22ch] text-[clamp(1.8rem,4vw,2.6rem)]">
+            Bring one swing.
+            <br />
+            <span className="text-[color:var(--muted)]">
+              Leave with one thing to work on.
+            </span>
+          </h2>
+          <p className="mx-auto mt-5 max-w-[52ch] text-[13.5px] leading-[1.7] text-[color:var(--muted)]">
             Upload your own clip, or run a demo swing through the full pipeline
             right now — no account required to look around.
           </p>
-          <div className="relative mt-8 flex flex-wrap justify-center gap-3">
-            <Button
-              asChild
-              className="h-11 bg-white px-6 text-[15px] text-[color:var(--fairway)] hover:bg-[#f3f6f2]"
+          <div className="mt-9 flex flex-wrap justify-center gap-3">
+            <Link
+              href="/upload"
+              className="rounded-[3px] bg-[color:var(--green)] px-6 py-3 text-[14px] font-semibold tracking-[0.03em] text-[color:var(--primary-foreground)] transition hover:opacity-90"
             >
-              <Link href="/upload">Upload a swing</Link>
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              className="h-11 border-white/30 bg-transparent px-6 text-[15px] text-white hover:bg-white/10 hover:text-white"
+              Upload a swing
+            </Link>
+            <Link
+              href="/sign-up"
+              className="rounded-[3px] border border-[color:var(--rule-strong)] px-6 py-3 text-[14px] tracking-[0.03em] transition hover:border-[color:var(--green)] hover:text-[color:var(--green)]"
             >
-              <Link href="/sign-up">Create an account</Link>
-            </Button>
+              Create an account
+            </Link>
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
-      <footer className="border-t border-[color:var(--line)] px-6 py-8">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 text-sm text-[color:var(--ink-muted)] sm:flex-row">
-          <span className="font-[family-name:var(--font-display)] text-[color:var(--fairway)]">
-            Golf AI
+      <footer className="border-t border-[color:var(--rule)]">
+        <div className="mx-auto flex max-w-[1120px] flex-col items-center justify-between gap-3 px-5 py-8 text-[12px] text-[color:var(--faint)] sm:flex-row sm:px-8">
+          <span className="flex items-center gap-2.5">
+            <LogoMark size={22} />
+            <span className="gi-display text-[15px] text-[color:var(--ink)]">
+              Grip Intelligence
+            </span>
           </span>
-          <p>Upload-only, single-camera analysis. Not a substitute for in-person coaching.</p>
+          <p className="text-center sm:text-right">
+            Upload-only, single-camera analysis. Not a substitute for in-person
+            coaching.
+          </p>
         </div>
       </footer>
-    </main>
+    </div>
   );
 }

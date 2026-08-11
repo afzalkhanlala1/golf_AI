@@ -162,7 +162,7 @@ export function PreprocessLab() {
 
   return (
     <div className="mt-8 space-y-8">
-      <div className="rounded-xl border border-dashed border-[color:var(--fairway-soft)] bg-white/60 p-5">
+      <div className="rounded-[2px] border border-dashed border-[color:var(--fairway-soft)] bg-[color:var(--surface)] p-5">
         <p className="mb-3 font-medium text-[color:var(--fairway)]">
           {file?.name ?? "Choose a video to inspect"}
         </p>
@@ -174,7 +174,7 @@ export function PreprocessLab() {
       </div>
 
       {error && (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+        <p className="border-l-2 border-[color:var(--bad)] bg-[color:var(--sunk)] px-4 py-3 text-sm leading-relaxed text-[color:var(--bad)]">
           {error}
         </p>
       )}
@@ -210,10 +210,10 @@ export function PreprocessLab() {
               ].map((s) => (
                 <div
                   key={s.label}
-                  className={`rounded-xl border px-4 py-3 ${
+                  className={`rounded-[2px] border px-4 py-3 ${
                     s.bad
-                      ? "border-amber-300 bg-amber-50"
-                      : "border-[color:var(--line)] bg-white/80"
+                      ? "border-[color:var(--warn)] bg-[color:var(--sunk)]"
+                      : "border-[color:var(--line)] bg-[color:var(--surface)]"
                   }`}
                 >
                   <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--ink-muted)]">
@@ -227,7 +227,7 @@ export function PreprocessLab() {
             </div>
           </section>
 
-          <section className="space-y-4 rounded-xl border border-[color:var(--line)] bg-white/70 p-5">
+          <section className="space-y-4 rounded-[2px] border border-[color:var(--line)] bg-[color:var(--surface)] p-5">
             <h2 className="font-[family-name:var(--font-display)] text-xl text-[color:var(--fairway)]">
               Conditioning
             </h2>
@@ -296,7 +296,7 @@ export function PreprocessLab() {
                 {outcome.caveats.map((s) => (
                   <p
                     key={s}
-                    className="rounded-lg bg-[color:var(--sand-soft)] px-3 py-2 text-[color:var(--ink)]"
+                    className="rounded-[2px] bg-[color:var(--sand-soft)] px-3 py-2 text-[color:var(--ink)]"
                   >
                     {s}
                   </p>
@@ -320,7 +320,7 @@ export function PreprocessLab() {
             {built.width}×{built.height} · {built.realCount} real +{" "}
             {built.syntheticCount} synthetic frames · ~{Math.round(built.outFps)}fps
           </p>
-          <div className="overflow-hidden rounded-2xl border border-[color:var(--line)] bg-black">
+          <div className="overflow-hidden rounded-[2px] border border-[color:var(--line)] bg-black">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={built.frames[Math.min(playIndex, built.frames.length - 1)]}

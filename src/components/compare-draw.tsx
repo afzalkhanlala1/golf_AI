@@ -89,19 +89,10 @@ export function CompareDraw() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">
-          Compare &amp; Draw
-        </p>
-        <h1 className="font-[family-name:var(--font-display)] text-4xl">
-          Two swings, side by side.
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-[color:var(--ink-muted)]">
-          Scrub both together and draw straight on the frames. Lines and
-          angles are anchored to the video, so they stay put when the window
-          resizes.
-        </p>
-      </div>
+      <p className="max-w-[60ch] text-[12.5px] leading-[1.7] text-[color:var(--muted)]">
+        Scrub both together and draw straight on the frames. Lines and angles
+        are anchored to the video, so they stay put when the window resizes.
+      </p>
 
       <div className="flex flex-wrap items-center gap-2">
         {TOOLS.map((t) => (
@@ -397,7 +388,7 @@ function ComparePane({
         ))}
       </select>
 
-      <div ref={wrapRef} className="relative overflow-hidden rounded-xl bg-black">
+      <div ref={wrapRef} className="relative overflow-hidden rounded-[2px] bg-black">
         {swing && (
           <video
             ref={videoRef}

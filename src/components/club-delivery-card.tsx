@@ -77,7 +77,7 @@ export function ClubDeliveryCard({
   const hasAny = clubhead || ball || smash || attack;
 
   return (
-    <section className="rounded-xl border border-[color:var(--line)] p-4">
+    <section className="rounded-[2px] border border-[color:var(--line)] p-4">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">
           Club delivery

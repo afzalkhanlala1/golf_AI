@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 import { SwingPlayer } from "@/components/swing-player";
 import { SwingPlayer3D } from "@/components/swing-player-3d";
 import { ClubDeliveryCard } from "@/components/club-delivery-card";
+import { PageHeader, SectionHead } from "@/components/page-header";
 import { formatShortDate } from "@/lib/format/date";
 
 /**
@@ -91,6 +92,51 @@ const PHASES = [
   "finish",
 ] as const;
 
+/** Scores carry more decimals than single-camera video can justify. */
+function show(n: number | null | undefined): string {
+  return n == null || !Number.isFinite(n) ? "—" : String(Math.round(n));
+}
+
+/** snake_case metric keys are database identifiers, not English. */
+function humanise(key: string): string {
+  const cleaned = key.replace(/_(deg|ms|cm|mph|idx|index)$/, "").replaceAll("_", " ");
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+function unitSuffix(unit: string): string {
+  if (unit === "deg") return "°";
+  if (unit === "ms") return " ms";
+  if (unit === "cm") return " cm";
+  if (unit === "mph") return " mph";
+  return "";
+}
+
+function toneForScore(v: number): string {
+  return v >= 75 ? "var(--green)" : v >= 60 ? "var(--ink)" : "var(--warn)";
+}
+
+/** Shared frame for the states where there is no analysis to show yet. */
+function StatusPage({
+  kicker,
+  title,
+  accent,
+  lede,
+  children,
+}: {
+  kicker: string;
+  title: string;
+  accent?: string;
+  lede?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div>
+      <PageHeader kicker={kicker} title={title} accent={accent} lede={lede} />
+      {children ? <div className="mt-8">{children}</div> : null}
+    </div>
+  );
+}
+
 export function SwingResult({ id }: { id: string }) {
   const [data, setData] = useState<SwingPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -163,14 +209,29 @@ export function SwingResult({ id }: { id: string }) {
   }, [id]);
 
   if (error) {
-    return <p className="text-red-700">{error}</p>;
+    return (
+      <StatusPage
+        kicker="Swing"
+        title="This swing would not load."
+        accent={error}
+        lede="The record may have been deleted, or the connection dropped mid-request."
+      >
+        <Link
+          href="/swings"
+          className="inline-block border border-[color:var(--green)] px-5 py-2.5 text-[13px] font-semibold tracking-[0.03em] text-[color:var(--green)] transition hover:bg-[color:var(--green-soft)]"
+        >
+          Back to the ledger
+        </Link>
+      </StatusPage>
+    );
   }
 
   if (!data) {
     return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-8 w-40 rounded bg-[color:var(--mist)]" />
-        <div className="aspect-video rounded-xl bg-[color:var(--mist)]" />
+      <div className="animate-pulse space-y-5">
+        <div className="h-3 w-24 bg-[color:var(--sunk)]" />
+        <div className="h-12 w-80 max-w-full bg-[color:var(--sunk)]" />
+        <div className="aspect-video w-full bg-[color:var(--sunk)]" />
       </div>
     );
   }
@@ -186,67 +247,98 @@ export function SwingResult({ id }: { id: string }) {
 
   if (swing.status === "QUEUED" || swing.status === "PROCESSING") {
     return (
-      <div className="space-y-6">
-        <Badge variant="secondary">{swing.status}</Badge>
-        <h1 className="font-[family-name:var(--font-display)] text-3xl text-[color:var(--fairway)]">
-          Reading your swing…
-        </h1>
-        <p className="max-w-lg text-[color:var(--ink-muted)]">
-          Running pose + event detection on GPU — usually 1–3 minutes for a
-          slow-mo clip, then we score, detect faults, and write coaching notes.
-        </p>
-        <div className="h-2 overflow-hidden rounded-full bg-[color:var(--mist)]">
-          <div className="h-full w-1/3 animate-pulse bg-[color:var(--fairway)]" />
+      <StatusPage
+        kicker={`Swing · ${swing.status.toLowerCase()}`}
+        title="Reading your swing…"
+        accent="Pose and events are running."
+        lede="Usually one to three minutes for a slow-mo clip, then we score it, detect faults, and write the coaching note. This page updates itself."
+      >
+        <div className="h-[3px] w-full overflow-hidden bg-[color:var(--rule)]">
+          <div className="h-full w-1/3 animate-pulse bg-[color:var(--green)]" />
         </div>
         <video
           src={swing.blobUrl}
           controls
-          className="aspect-[9/16] max-h-[420px] w-full rounded-xl bg-black object-contain sm:aspect-video"
+          className="mt-8 aspect-[9/16] max-h-[420px] w-full bg-black object-contain sm:aspect-video"
         />
-      </div>
+      </StatusPage>
     );
   }
 
   if (swing.status === "REJECTED") {
     return (
-      <div className="space-y-4">
-        <Badge variant="destructive">REJECTED</Badge>
-        <h1 className="font-[family-name:var(--font-display)] text-3xl text-[color:var(--fairway)]">
-          Couldn’t analyze this clip
-        </h1>
-        <p className="max-w-xl text-[color:var(--ink)]">
-          {swing.rejectionReason}
-        </p>
-        <a href="/upload" className="inline-flex text-sm font-medium text-[color:var(--fairway)] underline">
+      <StatusPage
+        kicker="Swing · rejected"
+        title="We could not read this clip."
+        accent="Nothing was graded."
+        lede={swing.rejectionReason ?? undefined}
+      >
+        <Link
+          href="/upload"
+          className="inline-block border border-[color:var(--green)] px-5 py-2.5 text-[13px] font-semibold tracking-[0.03em] text-[color:var(--green)] transition hover:bg-[color:var(--green-soft)]"
+        >
           Re-film and upload again
-        </a>
-      </div>
+        </Link>
+      </StatusPage>
     );
   }
 
   if (swing.status === "FAILED") {
     return (
-      <div className="space-y-4">
-        <Badge variant="destructive">FAILED</Badge>
-        <h1 className="font-[family-name:var(--font-display)] text-3xl">
-          Something went wrong
-        </h1>
-        <p>{swing.rejectionReason ?? "Try uploading again."}</p>
-      </div>
+      <StatusPage
+        kicker="Swing · failed"
+        title="Something went wrong."
+        accent="This one is on us."
+        lede={swing.rejectionReason ?? "Try uploading the clip again."}
+      >
+        <Link
+          href="/upload"
+          className="inline-block border border-[color:var(--green)] px-5 py-2.5 text-[13px] font-semibold tracking-[0.03em] text-[color:var(--green)] transition hover:bg-[color:var(--green-soft)]"
+        >
+          Upload again
+        </Link>
+      </StatusPage>
     );
   }
 
+  const graded = metrics.length;
+  const clubLabel = (swing.club ?? "swing").replace("-", " ");
+
   return (
-    <div className="space-y-10">
+    <div>
+      <PageHeader
+        kicker={`${clubLabel} · ${swing.view.replaceAll("_", " ")}${swing.fps ? ` · ${swing.fps}fps` : ""}`}
+        title={
+          score == null
+            ? "Analysed, not graded."
+            : score.overall >= 75
+              ? "A clean read."
+              : score.overall >= 60
+                ? "Readable, with work to do."
+                : "Plenty to work on here."
+        }
+        accent={`${graded} ${graded === 1 ? "metric" : "metrics"} measured across the swing.`}
+        lede="Every phase score below expands into the metrics that produced it — value, target band, and confidence. Anything the camera could not see is left out rather than estimated."
+      />
+
       {swing.qualityWarnings && swing.qualityWarnings.length > 0 && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          Quality warnings: {swing.qualityWarnings.join(", ")}. Advice confidence is reduced.
+        <div
+          className="animate-rise mt-8 border-l bg-[color:var(--sunk)] px-5 py-4"
+          style={{ borderColor: "var(--warn)" }}
+        >
+          <p className="gi-kicker" style={{ color: "var(--warn)" }}>
+            Capture quality
+          </p>
+          <p className="mt-2 text-[12.5px] leading-[1.7] text-[color:var(--muted)]">
+            {swing.qualityWarnings.join(", ")}. Confidence in the advice below is
+            reduced accordingly.
+          </p>
         </div>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-4">
-          <div className="flex gap-1 rounded-lg bg-[color:var(--mist)] p-1 text-xs">
+      <div className="mt-9 grid gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+        <div>
+          <div className="flex gap-6 border-b border-[color:var(--rule)]">
             {(
               [
                 ["video", "Video"],
@@ -257,13 +349,17 @@ export function SwingResult({ id }: { id: string }) {
                 key={key}
                 type="button"
                 onClick={() => setView(key)}
-                className={`flex-1 rounded-md px-3 py-1.5 transition ${
-                  view === key
-                    ? "bg-[color:var(--fairway)] text-[color:var(--primary-foreground)]"
-                    : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
-                }`}
+                aria-pressed={view === key}
+                className="relative cursor-pointer pb-3 text-[13px] transition"
+                style={{
+                  color: view === key ? "var(--ink)" : "var(--muted)",
+                  fontWeight: view === key ? 600 : 400,
+                }}
               >
                 {label}
+                {view === key ? (
+                  <span className="absolute inset-x-0 -bottom-px h-[2px] bg-[color:var(--green)]" />
+                ) : null}
               </button>
             ))}
           </div>
@@ -271,7 +367,7 @@ export function SwingResult({ id }: { id: string }) {
           {/* Both players stay mounted — swapping tabs should not re-fetch
               the keypoint blob or throw away the camera angle the golfer
               just set up. */}
-          <div className={view === "video" ? "" : "hidden"}>
+          <div className={view === "video" ? "mt-5" : "hidden"}>
             <SwingPlayer
               swingId={swing.id}
               blobUrl={swing.blobUrl}
@@ -286,112 +382,136 @@ export function SwingResult({ id }: { id: string }) {
               ]}
             />
           </div>
-          <div className={view === "3d" ? "" : "hidden"}>
+          <div className={view === "3d" ? "mt-5" : "hidden"}>
             <SwingPlayer3D swingId={swing.id} ghostOptions={ghostOptions} />
           </div>
         </div>
 
-        <div className="space-y-6">
-          <ClubDeliveryCard
-            metrics={metrics}
-            clubTracking={swing.clubTracking ?? null}
-          />
-
-          <div>
-            <p className="text-sm uppercase tracking-[0.18em] text-[color:var(--ink-muted)]">
-              Swing score
-            </p>
-            <p className="font-[family-name:var(--font-display)] text-7xl leading-none text-[color:var(--fairway)]">
-              {score?.overall ?? "—"}
-            </p>
+        <div>
+          <div className="border-t border-b border-[color:var(--rule)] py-5">
+            <p className="gi-kicker">Swing score</p>
+            <p className="gi-figure mt-2 text-[72px]">{show(score?.overall)}</p>
           </div>
 
-          <div className="space-y-2">
+          <div className="mt-1">
             {PHASES.map((phase) => {
               const value = score?.[phase] ?? 0;
+              const open = openPhase === phase;
+              const rows = metrics.filter(
+                (m) =>
+                  m.phase === phase ||
+                  (m.phase === "full" && (phase === "setup" || phase === "finish")),
+              );
               return (
-                <button
-                  key={phase}
-                  type="button"
-                  onClick={() =>
-                    setOpenPhase((p) => (p === phase ? null : phase))
-                  }
-                  className="w-full text-left"
-                >
-                  <div className="mb-1 flex justify-between text-sm">
-                    <span className="capitalize text-[color:var(--ink)]">{phase}</span>
-                    <span className="tabular-nums text-[color:var(--ink-muted)]">
-                      {value}
+                <div key={phase} className="border-b border-[color:var(--rule)]">
+                  <button
+                    type="button"
+                    onClick={() => setOpenPhase((p) => (p === phase ? null : phase))}
+                    aria-expanded={open}
+                    className="flex w-full cursor-pointer items-center gap-4 py-3 text-left"
+                  >
+                    <span className="flex-1 text-[13px] capitalize">{phase}</span>
+                    <span className="relative block h-[3px] w-[80px] bg-[color:var(--rule)]">
+                      <span
+                        className="absolute inset-y-0 left-0"
+                        style={{
+                          width: `${value}%`,
+                          background: toneForScore(value),
+                        }}
+                      />
                     </span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-[color:var(--mist)]">
-                    <div
-                      className="h-full bg-[color:var(--fairway)]"
-                      style={{ width: `${value}%` }}
-                    />
-                  </div>
-                  {openPhase === phase && (
-                    <ul className="mt-2 space-y-1 rounded-lg bg-white/70 p-3 text-xs text-[color:var(--ink-muted)]">
-                      {metrics
-                        .filter(
-                          (m) =>
-                            m.phase === phase ||
-                            (m.phase === "full" &&
-                              (phase === "setup" || phase === "finish")),
-                        )
-                        .map((m) => (
-                          <li key={`${phase}-${m.key}`} className="flex justify-between gap-3">
-                            <span>{m.key}</span>
-                            <span className="tabular-nums text-right">
-                              {m.value}
-                              {m.unit === "deg" ? "°" : m.unit === "ms" ? "ms" : ""}
-                              {m.targetMin != null && m.targetMax != null
-                                ? ` (target ${m.targetMin}–${m.targetMax})`
-                                : ""}
-                              {m.confidence < 0.5 ? " · low conf" : ""}
-                              {m.key === "kinematic_sequence_index"
-                                ? " · directional proxy"
-                                : ""}
+                    <span
+                      className="w-8 text-right text-[11.5px] tabular-nums"
+                      style={{ color: toneForScore(value) }}
+                    >
+                      {show(value)}
+                    </span>
+                    <span className="w-3 text-[10px] text-[color:var(--faint)]">
+                      {open ? "−" : "+"}
+                    </span>
+                  </button>
+                  {open && (
+                    <ul className="mb-3 bg-[color:var(--sunk)] px-3.5 py-3">
+                      {rows.length === 0 ? (
+                        <li className="text-[11.5px] text-[color:var(--muted)]">
+                          Nothing measurable in this phase from this angle.
+                        </li>
+                      ) : (
+                        rows.map((m) => (
+                          <li
+                            key={`${phase}-${m.key}`}
+                            className="flex justify-between gap-3 py-1 text-[11.5px]"
+                          >
+                            <span className="text-[color:var(--muted)]">
+                              {humanise(m.key)}
+                            </span>
+                            <span className="text-right tabular-nums">
+                              {Math.round(m.value * 10) / 10}
+                              {unitSuffix(m.unit)}
+                              {m.targetMin != null && m.targetMax != null ? (
+                                <span className="text-[color:var(--faint)]">
+                                  {" "}
+                                  (target {m.targetMin}–{m.targetMax})
+                                </span>
+                              ) : null}
+                              {m.confidence < 0.5 ? (
+                                <span style={{ color: "var(--warn)" }}> · low conf</span>
+                              ) : null}
                             </span>
                           </li>
-                        ))}
+                        ))
+                      )}
                     </ul>
                   )}
-                </button>
+                </div>
               );
             })}
+          </div>
+
+          <div className="mt-8">
+            <ClubDeliveryCard
+              metrics={metrics}
+              clubTracking={swing.clubTracking ?? null}
+            />
           </div>
         </div>
       </div>
 
-      <section className="space-y-3">
-        <h2 className="font-[family-name:var(--font-display)] text-2xl text-[color:var(--fairway)]">
-          Faults
-        </h2>
+      <section className="animate-rise mt-12">
+        <SectionHead
+          title="Faults"
+          note={faults.length > 0 ? "TPI Big 12 · with the metric behind each" : undefined}
+        />
         {faults.length === 0 ? (
-          <p className="text-[color:var(--ink-muted)]">No major faults surfaced.</p>
+          <p className="py-6 text-[13px] text-[color:var(--muted)]">
+            No major faults surfaced in this swing.
+          </p>
         ) : (
-          <div className="grid gap-3">
+          <div>
             {faults.map((f, i) => (
               <div
                 key={f.code}
-                className={`rounded-xl border px-4 py-4 ${
-                  i === 0
-                    ? "border-[color:var(--fairway)] bg-[color:var(--mist)]"
-                    : "border-[color:var(--line)] bg-white/70"
-                }`}
+                className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5 border-b border-[color:var(--rule)] py-4"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="font-medium capitalize">
-                    {f.code.replaceAll("_", " ")}
-                    {i === 0 ? " · primary focus" : ""}
-                  </h3>
-                  <span className="text-sm tabular-nums text-[color:var(--ink-muted)]">
-                    severity {(f.severity * 100).toFixed(0)}%
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-[color:var(--ink-muted)]">
-                  Phase {f.phase} · from {f.detectedFrom.join(", ")}
+                <span className="w-5 shrink-0 text-[10.5px] tabular-nums text-[color:var(--faint)]">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <h3 className="text-[14px] capitalize">
+                  {f.code.replaceAll("_", " ")}
+                  {i === 0 ? (
+                    <span
+                      className="ml-2.5 text-[10px] tracking-[0.12em] uppercase"
+                      style={{ color: "var(--green)" }}
+                    >
+                      primary focus
+                    </span>
+                  ) : null}
+                </h3>
+                <span className="ml-auto text-[11.5px] tabular-nums text-[color:var(--muted)]">
+                  severity {(f.severity * 100).toFixed(0)}%
+                </span>
+                <p className="w-full pl-9 text-[11.5px] text-[color:var(--faint)]">
+                  {f.phase} · detected from {f.detectedFrom.join(", ")}
                 </p>
               </div>
             ))}
@@ -400,26 +520,44 @@ export function SwingResult({ id }: { id: string }) {
       </section>
 
       {feedback && body && (
-        <section className="space-y-4 rounded-2xl border border-[color:var(--line)] bg-white/80 p-6">
-          <h2 className="font-[family-name:var(--font-display)] text-2xl text-[color:var(--fairway)]">
-            {feedback.headline}
-          </h2>
-          <p>{body.whatIsHappening}</p>
-          <p className="text-[color:var(--ink-muted)]">{body.whyItMatters}</p>
-          <p className="font-medium">{body.oneThingToFocusOn}</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {feedback.drills.map((d) => (
-              <div
-                key={d.title}
-                className="rounded-xl bg-[color:var(--mist)] px-4 py-3"
-              >
-                <div className="font-medium">{d.title}</div>
-                <p className="mt-1 text-sm text-[color:var(--ink-muted)]">{d.cue}</p>
-                <p className="mt-2 text-xs uppercase tracking-wide text-[color:var(--fairway)]">
-                  {d.reps} reps
-                </p>
+        <section className="animate-rise mt-12">
+          <SectionHead title="The coaching note" note="Explained, never measured" />
+          <div className="mt-6 grid gap-10 lg:grid-cols-[1.15fr_0.85fr]">
+            <div>
+              <h3 className="gi-display text-[26px] leading-[1.15]">
+                {feedback.headline}
+              </h3>
+              <p className="mt-4 text-[13.5px] leading-[1.75]">
+                {body.whatIsHappening}
+              </p>
+              <p className="mt-3 text-[13px] leading-[1.75] text-[color:var(--muted)]">
+                {body.whyItMatters}
+              </p>
+              <p className="mt-5 border-l border-[color:var(--green-line)] pl-4 text-[13.5px] leading-[1.75] font-medium">
+                {body.oneThingToFocusOn}
+              </p>
+            </div>
+            <div>
+              <p className="gi-kicker">Drills</p>
+              <div className="mt-3">
+                {feedback.drills.map((d) => (
+                  <div
+                    key={d.title}
+                    className="border-b border-[color:var(--rule)] py-3.5"
+                  >
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-[13px] font-medium">{d.title}</span>
+                      <span className="shrink-0 text-[10px] tracking-[0.12em] text-[color:var(--faint)] uppercase">
+                        {d.reps} reps
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-[11.5px] leading-[1.65] text-[color:var(--muted)]">
+                      {d.cue}
+                    </p>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </section>
       )}

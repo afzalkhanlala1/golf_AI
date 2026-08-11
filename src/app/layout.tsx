@@ -1,22 +1,23 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
-import { Fraunces, Source_Sans_3 } from "next/font/google";
+import { Cormorant_Garamond, Lora } from "next/font/google";
 import { isAuthDisabled } from "@/lib/auth-mode";
 import { THEME_INIT_SCRIPT } from "@/components/theme-toggle";
 import "./globals.css";
 
-const display = Fraunces({
+const display = Cormorant_Garamond({
   variable: "--font-display",
+  weight: ["400", "500", "600"],
   subsets: ["latin"],
 });
 
-const sans = Source_Sans_3({
+const sans = Lora({
   variable: "--font-sans-body",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "Golf AI",
+  title: "Grip Intelligence · AI Golfing Coach",
   description: "AI-powered golf swing analysis from slow-motion video uploads.",
 };
 
