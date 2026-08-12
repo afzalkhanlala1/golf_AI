@@ -2,20 +2,69 @@
  * The Grip Intelligence crest: a hexagonal shield, two broken rings, and a
  * golfer at address.
  *
- * `animate` runs the full 4.2s swing sequence — club back, through impact,
- * ball away down its arc, and a burst at the apex. The rings are split into
- * two groups that rotate on different curves so the mark reads as a swing
- * rather than a spinning logo. Everything is driven by CSS keyframes in
- * globals.css, so it costs no JavaScript and stops dead under
- * prefers-reduced-motion.
+ * `animate` runs the swing sequence — club back, through impact, ball away
+ * down its arc, and a burst at the apex. The rings are split into two groups
+ * that rotate on different curves so the mark reads as a swing rather than a
+ * spinning logo. Everything is driven by CSS keyframes in globals.css, so it
+ * costs no JavaScript and stops dead under prefers-reduced-motion.
+ *
+ * The defaults reproduce the looping 4.2s hero crest. The intro sequences in
+ * components/intro drive the same mark differently:
+ *   `draw`     — ink the shield and rings on instead of showing them outright
+ *   `loop`     — off for a single swing that settles rather than repeating
+ *   `duration` — scales the whole timeline, so impact stays at 36% of it
+ *   `delay`    — holds address while the draw finishes
+ *
+ * Every strike lands at the same fraction of `duration`, which is what lets a
+ * caller sync a screen wipe to impact without hardcoding frame numbers.
  */
 export function LogoMark({
   size = 28,
   animate = false,
+  loop = true,
+  duration = 4.2,
+  delay = 0,
+  draw = false,
+  drawDelay = 0,
 }: {
   size?: number;
   animate?: boolean;
+  /** Repeat the swing forever. Off leaves the mark settled after one. */
+  loop?: boolean;
+  /** Full swing timeline in seconds. Impact is at 36%, the burst at 58%. */
+  duration?: number;
+  /** Milliseconds held at address before the swing starts. */
+  delay?: number;
+  /** Ink the stroked parts on rather than having them present at frame one. */
+  draw?: boolean;
+  drawDelay?: number;
 }) {
+  const count = loop ? "infinite" : "1 both";
+  const run = (name: string, curve: string) =>
+    animate ? `${name} ${duration}s ${curve} ${delay}ms ${count}` : undefined;
+
+  /**
+   * Dash-draw for a stroked path. `pathLength` renormalises the geometry to 1
+   * so the dash values are the same for the shield and for a short arc — no
+   * per-path length measuring, and it survives an edit to the `d`.
+   */
+  const ink = (offset: number, ms: number) =>
+    draw
+      ? {
+          pathLength: 1,
+          strokeDasharray: 1,
+          style: {
+            strokeDashoffset: 1,
+            animation: `gi-crest-draw ${ms}ms cubic-bezier(.22,1,.36,1) ${drawDelay + offset}ms both`,
+          },
+        }
+      : {};
+
+  /** Solid shapes cannot be drawn, so they arrive as the last stroke lands. */
+  const fadeIn = draw
+    ? `gi-fade 460ms cubic-bezier(.22,1,.36,1) ${drawDelay + 760}ms both`
+    : undefined;
+
   return (
     <svg
       viewBox="0 0 200 200"
@@ -31,6 +80,7 @@ export function LogoMark({
         fill="none"
         stroke="var(--green)"
         strokeWidth="9"
+        {...ink(0, 1040)}
       />
 
       {/* Outer rings — carry the ball's arc when animating. */}
@@ -38,9 +88,7 @@ export function LogoMark({
         style={{
           transformBox: "view-box",
           transformOrigin: "100px 102px",
-          animation: animate
-            ? "gi-ring-ball 4.2s cubic-bezier(.12,.72,.24,1) infinite"
-            : undefined,
+          animation: run("gi-ring-ball", "cubic-bezier(.12,.72,.24,1)"),
         }}
       >
         <path
@@ -49,6 +97,7 @@ export function LogoMark({
           stroke="var(--green)"
           strokeWidth="5.5"
           strokeLinecap="round"
+          {...ink(300, 720)}
         />
         <path
           d="M161.8 96.6 A62 62 0 0 1 129.1 156.7"
@@ -56,6 +105,7 @@ export function LogoMark({
           stroke="var(--green)"
           strokeWidth="5.5"
           strokeLinecap="round"
+          {...ink(380, 720)}
         />
         {animate ? (
           <path
@@ -64,6 +114,7 @@ export function LogoMark({
             stroke="var(--none)"
             strokeWidth="5.5"
             strokeLinecap="round"
+            {...ink(460, 720)}
           />
         ) : null}
       </g>
@@ -73,9 +124,7 @@ export function LogoMark({
         style={{
           transformBox: "view-box",
           transformOrigin: "100px 102px",
-          animation: animate
-            ? "gi-ring-club 4.2s cubic-bezier(.5,0,.35,1) infinite"
-            : undefined,
+          animation: run("gi-ring-club", "cubic-bezier(.5,0,.35,1)"),
         }}
       >
         <path
@@ -84,6 +133,7 @@ export function LogoMark({
           stroke="var(--green)"
           strokeWidth="6.5"
           strokeLinecap="round"
+          {...ink(520, 640)}
         />
       </g>
 
@@ -91,6 +141,7 @@ export function LogoMark({
       <path
         d="M46.9 134 A62 62 0 0 0 153.1 134 Q100 139 46.9 134 Z"
         fill="var(--green)"
+        style={{ animation: fadeIn }}
       />
 
       {animate ? (
@@ -101,9 +152,16 @@ export function LogoMark({
             cy="140"
             r="2.4"
             fill="var(--surface)"
-            style={{ animation: "gi-tee 4.2s steps(1,end) infinite" }}
+            style={{ animation: run("gi-tee", "steps(1,end)") }}
           />
-          <circle cx="90" cy="146" r="1.7" fill="var(--surface)" opacity=".7" />
+          <circle
+            cx="90"
+            cy="146"
+            r="1.7"
+            fill="var(--surface)"
+            opacity=".7"
+            style={{ animation: fadeIn }}
+          />
           <path
             d="M143 140 C156 112 168 74 176 26"
             fill="none"
@@ -112,14 +170,14 @@ export function LogoMark({
             strokeLinecap="round"
             strokeDasharray="300"
             opacity="0"
-            style={{ animation: "gi-trail 4.2s ease-out infinite" }}
+            style={{ animation: run("gi-trail", "ease-out") }}
           />
           <circle
             r="3"
             fill="var(--surface)"
             style={{
               offsetPath: "path('M143 140 C156 112 168 74 176 26')",
-              animation: "gi-ballfly 4.2s cubic-bezier(.18,.62,.3,1) infinite",
+              animation: run("gi-ballfly", "cubic-bezier(.18,.62,.3,1)"),
             }}
           />
           {/* Burst at the apex. */}
@@ -135,7 +193,7 @@ export function LogoMark({
               style={{
                 transformBox: "view-box",
                 transformOrigin: "176px 26px",
-                animation: "gi-flash 4.2s ease-out infinite",
+                animation: run("gi-flash", "ease-out"),
               }}
             />
             <g
@@ -146,7 +204,7 @@ export function LogoMark({
               style={{
                 transformBox: "view-box",
                 transformOrigin: "176px 26px",
-                animation: "gi-spark 4.2s cubic-bezier(.16,.8,.3,1) infinite",
+                animation: run("gi-spark", "cubic-bezier(.16,.8,.3,1)"),
               }}
             >
               <path d="M176 14 L176 5" />
@@ -163,7 +221,7 @@ export function LogoMark({
       ) : null}
 
       {/* Golfer — body stays put; only the arms and club swing. */}
-      <g fill="var(--ink)">
+      <g fill="var(--ink)" style={{ animation: fadeIn }}>
         <circle cx="103" cy="60" r="6.3" />
         <path d="M95.5 69.5 L112 66 L109.5 84 L107.5 96.5 L98.5 96.5 L96.5 82 Z" />
         <path d="M96 93 L106 93 L102 120 L101 138 L92.5 138 L94.5 118 Z" />
@@ -176,9 +234,11 @@ export function LogoMark({
         style={{
           transformBox: "view-box",
           transformOrigin: "103px 94px",
-          animation: animate
-            ? "gi-swing 4.2s cubic-bezier(.5,0,.35,1) infinite"
-            : undefined,
+          // Two animations on one element: the fade owns opacity, the swing
+          // owns transform, so they compose instead of overwriting.
+          animation: [fadeIn, run("gi-swing", "cubic-bezier(.5,0,.35,1)")]
+            .filter(Boolean)
+            .join(", "),
         }}
       >
         <path d="M105 79.6 L112.3 82.8 L120.3 64.5 L112.9 61.3 Z" fill="var(--ink)" />

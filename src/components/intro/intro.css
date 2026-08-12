@@ -1,0 +1,250 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Intro keyframes.
+
+   Kept out of globals.css because none of it is app chrome — it only ships on
+   routes that actually mount an intro. The crest's own motion lives in
+   globals.css alongside the mark; everything here is the screen around it.
+
+   prefers-reduced-motion is already handled globally: every animation and
+   transition is disabled there, so each intro renders its end state and the
+   JS timer routes straight through.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ── I. The Draw ─────────────────────────────────────────────────────────
+   The wordmark does not fade in — it tightens. Starting wide and settling to
+   the real tracking is what makes it read as typeset rather than animated. */
+@keyframes gi-intro-tighten {
+  from {
+    opacity: 0;
+    letter-spacing: 0.44em;
+  }
+  40% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    letter-spacing: 0.02em;
+  }
+}
+
+@keyframes gi-intro-rule-out {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Blooms in the destination page's own background colour, so the cut reads as
+   the app arriving rather than as a white frame spliced in. */
+@keyframes gi-intro-bloom {
+  0% {
+    opacity: 0;
+  }
+  22%,
+  46% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+
+/* ── II. Handoff ─────────────────────────────────────────────────────────
+   The flight itself is measured in JS — only the surrounding fades are here. */
+@keyframes gi-intro-lift {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes gi-intro-drop {
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* ── III. Impact wipe ────────────────────────────────────────────────────
+   One frame of green at the moment of contact. Short enough to feel like a
+   camera flash rather than a colour change. */
+@keyframes gi-intro-hit {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  6%,
+  46% {
+    opacity: 1;
+  }
+}
+
+/* The ball's line, drawn across the whole viewport instead of inside the
+   crest. Scales from the strike point outward. */
+@keyframes gi-intro-streak {
+  0% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  70% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+
+/* Follows the streak across and off, dragging the page in behind it.
+   +28deg puts the leading edge square to a travel direction of up-and-right,
+   which is the way the ball actually leaves the crest.
+
+   The plateau at 46–60% is load-bearing, not styling. A panel this size
+   sweeping ±150% of its own height crosses the one position where it actually
+   covers the viewport in about 20ms — one frame — and the paper underneath
+   has to be cut while it is covered. Holding it still there turns a
+   one-frame window into ~120ms, and makes the safe moment a constant of the
+   keyframe rather than something inferred from an easing curve. */
+@keyframes gi-intro-curtain {
+  0% {
+    transform: rotate(28deg) translateY(150%);
+  }
+  46%,
+  60% {
+    transform: rotate(28deg) translateY(0%);
+  }
+  100% {
+    transform: rotate(28deg) translateY(-150%);
+  }
+}
+
+/* ── IV. Ledger unfurl ───────────────────────────────────────────────────
+   Hairlines cross at centre, then push out to become the page's own borders. */
+@keyframes gi-intro-ruleh {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes gi-intro-rulev {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* Reveals the kicker a character at a time. `steps()` keeps glyphs from ever
+   being caught mid-fade — each is either set or not yet set.
+
+   Clipped rather than width-animated: a percentage width resolves against the
+   *container*, which here is several times wider than the text, so the reveal
+   would finish a quarter of the way in and then spend the rest of its run
+   opening empty space. inset() percentages resolve against the element's own
+   box, so the steps land on the glyphs whatever the layout around it. */
+@keyframes gi-intro-set {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Each rule travels exactly its own frame inset, so it lands flush on the
+   viewport edge instead of at a distance that only looks right at one width.
+   --gi-inset is set on the frame the rules belong to. */
+@keyframes gi-intro-edge-t {
+  to {
+    transform: translateY(calc(-1 * var(--gi-inset))) scaleX(1);
+  }
+}
+
+@keyframes gi-intro-edge-b {
+  to {
+    transform: translateY(var(--gi-inset)) scaleX(1);
+  }
+}
+
+@keyframes gi-intro-edge-l {
+  to {
+    transform: translateX(calc(-1 * var(--gi-inset))) scaleY(1);
+  }
+}
+
+@keyframes gi-intro-edge-r {
+  to {
+    transform: translateX(var(--gi-inset)) scaleY(1);
+  }
+}
+
+/* Shared fade-out, used wherever something simply has to stop being there. */
+@keyframes gi-intro-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* ── V. Slam ─────────────────────────────────────────────────────────────
+   Loud on purpose: two frames of overshoot, no easing in. */
+@keyframes gi-intro-slam {
+  0% {
+    opacity: 0;
+    transform: translateX(-14%) scale(1.5);
+  }
+  55% {
+    opacity: 1;
+    transform: translateX(2.5%) scale(0.97);
+  }
+  72% {
+    transform: translateX(-0.8%) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* No fade — the line is off, then it is on. Driven with steps(1, end). */
+@keyframes gi-intro-cut {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes gi-intro-sweep {
+  from {
+    transform: skewX(-14deg) translateX(-160%);
+  }
+  to {
+    transform: skewX(-14deg) translateX(160%);
+  }
+}
+
+@keyframes gi-intro-blackout {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
