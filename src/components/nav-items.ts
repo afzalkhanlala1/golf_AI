@@ -38,7 +38,17 @@ export const NAV_UTILITY: NavItem[] = [
   { href: "/settings", label: "Settings", note: "·" },
 ];
 
-export const NAV_ALL: NavItem[] = [...NAV_PRIMARY, ...NAV_LAB, ...NAV_UTILITY];
+/** Internal ledger. Rendered only for allowlisted emails, never in the golfer nav. */
+export const NAV_ADMIN: NavItem[] = [
+  { href: "/admin", label: "Admin", note: "·" },
+];
+
+export const NAV_ALL: NavItem[] = [
+  ...NAV_PRIMARY,
+  ...NAV_LAB,
+  ...NAV_UTILITY,
+  ...NAV_ADMIN,
+];
 
 /**
  * Longest-prefix match, so /swings/<id> still lights up "Swings" while an

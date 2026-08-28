@@ -32,6 +32,7 @@ async function main() {
         blobUrl: "https://example.com/demo-swing.mp4",
         view: "face_on",
         club: v.club,
+        source: "demo",
         status: "PROCESSING",
       })
       .returning();

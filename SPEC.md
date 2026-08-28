@@ -594,6 +594,7 @@ INFERENCE_SHARED_SECRET
 SWINGNET_CHECKPOINT_URL      # optional
 STRIPE_SECRET_KEY            # test mode
 NEXT_PUBLIC_APP_URL
+ADMIN_EMAILS                 # optional, comma-separated Clerk emails for /admin
 ```
 
 ---

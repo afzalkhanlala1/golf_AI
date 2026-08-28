@@ -2,6 +2,29 @@
 export const DEMO_VIDEO_URL =
   "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
 
+export type SwingSource = "upload" | "demo";
+
+/** True when the clip is the canned placeholder, not a golfer's own video. */
+export function isCannedDemoUrl(blobUrl: string): boolean {
+  return blobUrl === DEMO_VIDEO_URL;
+}
+
+/**
+ * How a new swing should be tagged.
+ *
+ * Club names cannot be used for this: the early-extension demo is stored as
+ * a `7i` so it looks like a real iron. The create payload's `demo` field,
+ * and the placeholder URL for rows created before `source` existed, are the
+ * only reliable signals.
+ */
+export function sourceForNewSwing(input: {
+  isDemo: boolean;
+  blobUrl: string;
+}): SwingSource {
+  if (input.isDemo || isCannedDemoUrl(input.blobUrl)) return "demo";
+  return "upload";
+}
+
 export const DEMO_SWINGS = [
   {
     id: "good",

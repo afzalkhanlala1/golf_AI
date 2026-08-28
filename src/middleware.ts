@@ -33,6 +33,7 @@ export default async function middleware(
     "/coach(.*)",
     "/fitting(.*)",
     "/settings(.*)",
+    "/admin(.*)",
   ]);
 
   return clerkMiddleware(async (auth, request) => {

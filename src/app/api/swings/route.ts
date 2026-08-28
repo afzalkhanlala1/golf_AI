@@ -12,7 +12,7 @@ import {
   markProcessing,
   persistAnalysisResult,
 } from "@/lib/swings/process";
-import { DEMO_SWINGS, DEMO_VIDEO_URL } from "@/lib/demos";
+import { DEMO_SWINGS, DEMO_VIDEO_URL, sourceForNewSwing } from "@/lib/demos";
 import { getEnv } from "@/lib/env";
 
 export const runtime = "nodejs";
@@ -68,6 +68,10 @@ export async function POST(request: Request) {
   const club =
     "club" in body ? (body.club ?? null) : (demo?.club ?? null);
   const view = body.view;
+  const source = sourceForNewSwing({
+    isDemo: "demo" in body,
+    blobUrl,
+  });
 
   const [swing] = await db
     .insert(swings)
@@ -76,6 +80,7 @@ export async function POST(request: Request) {
       blobUrl,
       view,
       club,
+      source,
       status: "QUEUED",
     })
     .returning();

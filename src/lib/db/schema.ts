@@ -24,6 +24,16 @@ export const cameraViewEnum = pgEnum("camera_view", [
   "unknown",
 ]);
 
+/**
+ * How the swing entered the pipeline.
+ *
+ * `upload` is a clip the golfer actually sent. `demo` is a canned run from
+ * the "Try a demo" buttons — same pipeline, placeholder video, not their
+ * swing. The admin ledger splits on this so a demo click is never counted
+ * as a submitted video.
+ */
+export const swingSourceEnum = pgEnum("swing_source", ["upload", "demo"]);
+
 export const users = pgTable("users", {
   id: text("id").primaryKey(), // Clerk user id
   email: text("email").notNull(),
@@ -63,6 +73,7 @@ export const swings = pgTable(
     keypointsUrl: text("keypoints_url"),
     view: cameraViewEnum("view").notNull().default("unknown"),
     club: text("club"),
+    source: swingSourceEnum("source").notNull().default("upload"),
     fps: real("fps"),
     durationMs: integer("duration_ms"),
     frameCount: integer("frame_count"),
@@ -86,7 +97,10 @@ export const swings = pgTable(
       .defaultNow(),
     analyzedAt: timestamp("analyzed_at", { withTimezone: true }),
   },
-  (t) => [index("swings_user_created_idx").on(t.userId, t.createdAt)],
+  (t) => [
+    index("swings_user_created_idx").on(t.userId, t.createdAt),
+    index("swings_source_created_idx").on(t.source, t.createdAt),
+  ],
 );
 
 export const swingEvents = pgTable("swing_events", {

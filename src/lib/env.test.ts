@@ -26,6 +26,17 @@ describe("getEnv", () => {
     const env = getEnv();
     expect(env.INFERENCE_MODE).toBe("mock");
     expect(env.OPENROUTER_API_KEY).toContain("sk-or");
+    expect(env.ADMIN_EMAILS).toBe("");
+  });
+
+  it("accepts an optional ADMIN_EMAILS allowlist", async () => {
+    for (const [key, value] of Object.entries(REQUIRED)) {
+      vi.stubEnv(key, value);
+    }
+    vi.stubEnv("ADMIN_EMAILS", "owner@example.com, ops@example.com");
+
+    const { getEnv } = await import("./env");
+    expect(getEnv().ADMIN_EMAILS).toBe("owner@example.com, ops@example.com");
   });
 
   it("fails fast when required vars are missing", async () => {

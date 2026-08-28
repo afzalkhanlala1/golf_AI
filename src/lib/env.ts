@@ -22,6 +22,11 @@ const envSchema = z.object({
   SWINGNET_CHECKPOINT_URL: z.string().url().optional().or(z.literal("")),
   STRIPE_SECRET_KEY: z.string().optional().or(z.literal("")),
   NEXT_PUBLIC_APP_URL: z.string().url("NEXT_PUBLIC_APP_URL must be a valid URL"),
+  /**
+   * Comma-separated Clerk emails that may open `/admin`. Empty means nobody
+   * is an admin (fail closed), except the local AUTH_DISABLED bypass.
+   */
+  ADMIN_EMAILS: z.string().optional().or(z.literal("")),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -51,6 +56,7 @@ export function getEnv(): Env {
     SWINGNET_CHECKPOINT_URL: process.env.SWINGNET_CHECKPOINT_URL ?? "",
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ?? "",
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    ADMIN_EMAILS: process.env.ADMIN_EMAILS ?? "",
   });
 
   if (!parsed.success) {

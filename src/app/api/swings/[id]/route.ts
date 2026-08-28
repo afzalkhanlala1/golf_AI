@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
+import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { getAuthUserId } from "@/lib/auth/current-user";
 import { getDb } from "@/lib/db";
 import {
@@ -24,13 +25,16 @@ export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
   const db = getDb();
 
-  const [swing] = await db
-    .select()
-    .from(swings)
-    .where(and(eq(swings.id, id), eq(swings.userId, userId)))
-    .limit(1);
+  const [swing] = await db.select().from(swings).where(eq(swings.id, id)).limit(1);
 
   if (!swing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // Owners see their own swings. Admins may open anyone's so the ledger can
+  // link through to the clip. A 404 (not 403) keeps other people's ids from
+  // leaking to a signed-in golfer who guessed a UUID.
+  if (swing.userId !== userId && !(await isCurrentUserAdmin())) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

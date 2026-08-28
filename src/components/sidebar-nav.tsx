@@ -7,6 +7,7 @@ import {
   NAV_LAB,
   NAV_PRIMARY,
   NAV_UTILITY,
+  NAV_ADMIN,
   activeItem,
   type NavItem,
 } from "@/components/nav-items";
@@ -97,7 +98,7 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   );
 }
 
-export function SidebarNav() {
+export function SidebarNav({ showAdmin = false }: { showAdmin?: boolean }) {
   const pathname = usePathname();
   const current = activeItem(pathname);
   const { navRef, mark } = useMarker(pathname);
@@ -133,6 +134,15 @@ export function SidebarNav() {
         {NAV_UTILITY.map((item) => (
           <NavLink key={item.href} item={item} active={current?.href === item.href} />
         ))}
+        {showAdmin
+          ? NAV_ADMIN.map((item) => (
+              <NavLink
+                key={item.href}
+                item={item}
+                active={current?.href === item.href}
+              />
+            ))
+          : null}
       </nav>
     </div>
   );

@@ -5,6 +5,7 @@ import { LogoMark, LogoWord } from "@/components/logo-mark";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { MobileNav } from "@/components/mobile-nav";
 import { AppTopBar } from "@/components/app-topbar";
+import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { isAuthDisabled } from "@/lib/auth-mode";
 import { getDb } from "@/lib/db";
 import { swings } from "@/lib/db/schema";
@@ -31,6 +32,12 @@ async function analysedCount(): Promise<number | null> {
 export async function AppShell({ children }: { children: React.ReactNode }) {
   const analysed = await analysedCount();
   const authDisabled = isAuthDisabled();
+  let showAdmin = false;
+  try {
+    showAdmin = await isCurrentUserAdmin();
+  } catch {
+    showAdmin = false;
+  }
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[264px_minmax(0,1fr)]">
@@ -43,7 +50,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
 
-        <SidebarNav />
+        <SidebarNav showAdmin={showAdmin} />
 
         <div className="px-[22px] pb-[18px]">
           <Link
@@ -80,7 +87,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         <div className="min-w-0 flex-1 pb-28 lg:pb-0">{children}</div>
       </div>
 
-      <MobileNav />
+      <MobileNav showAdmin={showAdmin} />
     </div>
   );
 }

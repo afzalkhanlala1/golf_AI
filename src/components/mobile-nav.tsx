@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { NAV_LAB, NAV_PRIMARY, NAV_UTILITY, activeItem } from "@/components/nav-items";
+import { NAV_LAB, NAV_PRIMARY, NAV_UTILITY, NAV_ADMIN, activeItem } from "@/components/nav-items";
 
 const TABS = NAV_PRIMARY.filter((i) => i.primary);
 /** Everything the tab bar could not fit, reachable through "More". */
@@ -20,13 +20,14 @@ const OVERFLOW = [
  * behind a sheet. The rule is that every route stays reachable in two taps —
  * hiding a room behind a menu is acceptable, making it unreachable is not.
  */
-export function MobileNav() {
+export function MobileNav({ showAdmin = false }: { showAdmin?: boolean }) {
   const pathname = usePathname();
   const current = activeItem(pathname);
   const [open, setOpen] = useState(false);
 
   const tabIndex = TABS.findIndex((t) => t.href === current?.href);
-  const inOverflow = OVERFLOW.some((i) => i.href === current?.href);
+  const overflow = showAdmin ? [...OVERFLOW, ...NAV_ADMIN] : OVERFLOW;
+  const inOverflow = overflow.some((i) => i.href === current?.href);
 
   // A tap that navigates should close the sheet; the route change is the
   // signal, so this covers back-button dismissal too.
@@ -64,7 +65,7 @@ export function MobileNav() {
           <div className="absolute inset-x-0 bottom-0 border-t border-[color:var(--rule)] bg-[color:var(--surface)] pb-[max(env(safe-area-inset-bottom),1rem)]">
             <p className="gi-kicker px-5 pt-5">More</p>
             <div className="mt-2 px-2 pb-3">
-              {OVERFLOW.map((item) => {
+              {overflow.map((item) => {
                 const active = current?.href === item.href;
                 return (
                   <Link
