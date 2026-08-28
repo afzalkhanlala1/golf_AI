@@ -2,8 +2,7 @@ import { z } from "zod";
 
 /**
  * Fail-fast environment validation.
- * OPENROUTER_API_KEY is used for coaching feedback (Phase B temporary
- * deviation from Anthropic SDK — same structured JSON contract).
+ * OPENROUTER_API_KEY is used for coaching feedback.
  */
 
 const envSchema = z.object({
