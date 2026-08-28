@@ -19,48 +19,31 @@ function clubLabel(club: string | null): string {
   return (club ?? "swing").replaceAll("-", " ");
 }
 
-function PersonRow({
-  person,
-  defaultOpen,
-}: {
-  person: Submitter;
-  defaultOpen?: boolean;
-}) {
+function PersonBlock({ person }: { person: Submitter }) {
   return (
-    <details className="gi-row group" open={defaultOpen}>
-      <summary className="flex cursor-pointer list-none items-baseline gap-4 py-4 pr-2 marker:content-none [&::-webkit-details-marker]:hidden">
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14.5px] font-medium">
-            {person.email}
-          </span>
-          <span className="mt-1 block truncate font-mono text-[11px] text-[color:var(--faint)]">
-            {person.userId}
-          </span>
+    <article className="border-b border-[color:var(--rule)] py-5">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <h3 className="min-w-0 truncate text-[15px] font-semibold tracking-[0.01em]">
+          {person.email}
+        </h3>
+        <span className="font-mono text-[11px] text-[color:var(--faint)]">
+          {person.userId}
         </span>
-        <span className="hidden shrink-0 text-[12.5px] tabular-nums text-[color:var(--muted)] sm:block">
+        <span className="ml-auto text-[12px] tabular-nums text-[color:var(--muted)]">
           {person.swingCount} {person.swingCount === 1 ? "clip" : "clips"}
         </span>
-        <span className="hidden shrink-0 text-[12.5px] text-[color:var(--muted)] md:block">
-          {formatDateTime(person.latestAt)}
-        </span>
-        <span
-          className="shrink-0 text-[10px] tracking-[0.12em] uppercase"
-          style={{ color: STATUS_TONE[person.latestStatus] ?? "var(--faint)" }}
-        >
-          {person.latestStatus.toLowerCase()}
-        </span>
-      </summary>
+      </div>
 
-      <div className="overflow-x-auto pb-4 pl-1">
+      <div className="mt-3 overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              {["Recorded", "Club · view", "Status", ""].map((h) => (
+              {["Recorded", "Club · view", "Status", ""].map((heading) => (
                 <th
-                  key={h || "actions"}
+                  key={heading || "actions"}
                   className="border-b border-[color:var(--rule)] py-2 pr-3 text-left text-[9.5px] font-medium tracking-[0.16em] text-[color:var(--faint)] uppercase"
                 >
-                  {h}
+                  {heading}
                 </th>
               ))}
             </tr>
@@ -110,7 +93,7 @@ function PersonRow({
           </tbody>
         </table>
       </div>
-    </details>
+    </article>
   );
 }
 
@@ -134,12 +117,8 @@ export function SubmitterList({
         </p>
       ) : (
         <div className="mt-2 border-t border-[color:var(--rule-strong)]">
-          {people.map((person, index) => (
-            <PersonRow
-              key={person.userId}
-              person={person}
-              defaultOpen={index === 0}
-            />
+          {people.map((person) => (
+            <PersonBlock key={person.userId} person={person} />
           ))}
         </div>
       )}
