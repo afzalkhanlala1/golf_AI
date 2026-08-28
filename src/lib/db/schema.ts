@@ -161,6 +161,44 @@ export const feedback = pgTable("feedback", {
     .defaultNow(),
 });
 
+/**
+ * Closed coach-review study. Invited coaches, not golfers.
+ *
+ * These tables are deliberately separate from `users` / `swings` so a
+ * Play-store account and a golfer's uploaded clip never appear on the
+ * review board. Coaches enter with an access code; they watch a sample we
+ * host, and they submit labels. Nothing they do creates an app user.
+ */
+export const coachReviewInvites = pgTable("coach_review_invites", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  /** Operator's name for this coach — the name on the invite list. */
+  name: text("name").notNull(),
+  /** SHA-256 of the normalised access code. The plaintext is shown once. */
+  codeHash: text("code_hash").notNull().unique(),
+  /** Last four characters of the code, so the board can hint without storing it. */
+  codeHint: text("code_hint").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const coachReviewSubmissions = pgTable("coach_review_submissions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  inviteId: uuid("invite_id")
+    .notNull()
+    .unique()
+    .references(() => coachReviewInvites.id, { onDelete: "cascade" }),
+  /** Which sample they labelled. One clip for this study. */
+  sampleId: text("sample_id").notNull(),
+  overallScore: integer("overall_score").notNull(),
+  primaryFault: text("primary_fault").notNull(),
+  faults: jsonb("faults").$type<string[]>().notNull().default([]),
+  notes: text("notes").notNull().default(""),
+  submittedAt: timestamp("submitted_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const drills = pgTable("drills", {
   id: uuid("id").defaultRandom().primaryKey(),
   faultCode: text("fault_code").notNull(),
