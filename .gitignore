@@ -66,6 +66,12 @@ next-env.d.ts
 Golf-AI-Build-Plan.pdf
 SPEC.md.txt
 
+# Editor / agent workspace files — not part of the product
+.claude/
+.agents/
+.cursor/
+skills-lock.json
+
 .vercel
 .env*
 

@@ -69,7 +69,7 @@ Browser
 - Clerk for auth
 - Zod for every boundary (env vars, API payloads, LLM output, inference callback)
 - Recharts for trend charts
-- `@anthropic-ai/sdk` for feedback generation
+- OpenRouter for feedback generation
 - Vitest (unit) + Playwright (e2e)
 
 **Inference service (user deploys separately — you write it, you do not deploy it)**
@@ -355,7 +355,7 @@ The single most important architectural rule in this project:
 ### 8.1 Flow
 
 1. Deterministic rules build a `FindingsPayload`: top faults, their severities, the specific metric values with their targets, phase scores, and the golfer's trend versus their last three swings.
-2. That payload — **JSON only, never video, never raw keypoints** — goes to Claude.
+2. That payload — **JSON only, never video, never raw keypoints** — goes to the coaching model.
 3. The model returns structured JSON, validated with Zod.
 4. A **numeric grounding validator** runs before anything is persisted.
 5. On failure, retry once with the violation named; on second failure, fall back to a deterministic template. Never show unvalidated output.
